@@ -1,7 +1,8 @@
 # syntax=docker/dockerfile:1.7
 FROM python:3.13-slim
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
+ENV LUNIT_SECRETS_FILE=/app/runtime_secret.json \
+    PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app/src \
     LUNIT_GENERATION_PROMPT_PATH=/app/prompts/generation/production_tool_v1.md \
@@ -18,6 +19,7 @@ RUN --mount=type=secret,id=custom_ca,required=false \
     pip install --no-cache-dir --disable-pip-version-check -r /app/requirements.txt
 
 COPY app.py /app/app.py
+COPY runtime_secret.json /app/runtime_secret.json
 COPY prompts/generation/production_tool_v1.md /app/prompts/generation/production_tool_v1.md
 COPY prompts/retrieval/grounded_v1.md /app/prompts/retrieval/grounded_v1.md
 COPY src /app/src
