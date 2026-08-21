@@ -31,6 +31,7 @@ Retrieval과 generation 프롬프트를 분리하고, Mock fixture를 고정 계
 - `generation/grounded_v2.md`: 이미 retrieval 결과를 받은 post-retrieval closed-book 후보입니다. 기존 결과를 보존하며 legacy 비교의 선택 프롬프트입니다.
 - `generation/production_tool_v1.md`: 모든 사용자 질문에 retrieval을 강제했던 보존용 baseline입니다.
 - `generation/production_tool_v2.md`: 일반 의료·비의료 질문은 직접 답하고 특정 근거·정밀 수치·희귀/비전형 사례만 독립형 query로 retrieval하는 production 후보입니다. Tool 결과 이후 숫자 citation과 closed-book 규칙은 유지합니다.
+- `generation/production_tool_v3.md`: v2의 조건부 routing을 간결화하고, 직접 답변을 기본값으로 명시한 현재 production prompt입니다. 명백한 일반·고수준 요청은 코드 게이트에서도 tool을 숨깁니다.
 - `retrieval/grounded_v1.md`: generation에서 해소된 standalone query만 받습니다. 지시어가 남으면 추측하지 않고 `no_evidence`로 종료하며, budget 종료 시 `partial` 또는 `no_evidence`를 반드시 finalize합니다.
 
 ## 전송 모드
@@ -38,7 +39,7 @@ Retrieval과 generation 프롬프트를 분리하고, Mock fixture를 고정 계
 `eval/simulator_runner.py`는 두 grounded transport를 지원합니다.
 
 - `legacy`: fixture JSON과 질문을 한 user message에 결합합니다. 기본 prompt는 `grounded_v2.md`입니다.
-- `tool`: 첫 API 호출에 실제 tool schema를 전달하고 assistant의 direct answer 또는 standalone retrieval query를 기록합니다. Retrieval을 호출한 경우 fixture 계약을 공식 trajectory 텍스트로 직렬화한 tool-role 결과를 반환한 뒤, assistant tool call과 tool message를 모두 보존한 두 번째 API 호출에서 최종 답변을 생성합니다. 기본 prompt는 `production_tool_v2.md`입니다.
+- `tool`: 첫 API 호출에 실제 tool schema를 전달하고 assistant의 direct answer 또는 standalone retrieval query를 기록합니다. Retrieval을 호출한 경우 fixture 계약을 공식 trajectory 텍스트로 직렬화한 tool-role 결과를 반환합니다. `no_evidence`는 production과 같이 model 재호출 없이 즉시 종료하고, 근거가 있을 때만 두 번째 API 호출에서 최종 답변을 생성합니다. 기본 prompt는 `production_tool_v3.md`입니다.
 
 멀티턴 tool 모드는 모든 사용자 turn에서 retrieval을 새로 호출합니다. `그 약`, `그 증상`, `앞의 환자`를 해소한 query, turn별 evidence, 응답 citation과 citation-number-to-`cite_uid` 매핑을 기록합니다.
 
@@ -46,7 +47,7 @@ Retrieval과 generation 프롬프트를 분리하고, Mock fixture를 고정 계
 
 - Model: `Lunit/L2-preview`
 - Temperature: `0.0`
-- Max tokens: `2048`
+- Max tokens: `1024` (citation repair `768`)
 - 주요 축: groundedness, citation correctness/completeness, unsupported addition, contradiction, deflection, no-evidence, standalone query, multi-turn citation stability.
 - Citation completeness는 각 주요 의학 주장 또는 수치 문장 끝의 citation을 검사합니다. 목록 소개 문장 하나의 citation은 아래 bullet을 대신하지 않습니다.
 - Citation correctness는 번호가 실제 source에 존재하고, 금지 source가 아니며, 해당 문장의 구성 용어가 case의 source-support 용어와 연결되는지 검사합니다.
@@ -141,3 +142,25 @@ Root `prompting.py`는 여전히 두 번째 system message, `[출처: cite_uid]`
 - Multi-turn cases SHA-256: `6459746F1185EFCFBFC79DC99A5991EC5A71B7290488A2B28F5D5ACA88292DCA`
 
 이 결과는 동일 prompt/case의 로컬 L2·fixture targeted smoke이며 공식 dashboard 점수가 아닙니다. 복합 MFDS 적응증+금기 live 질의는 한 evidence round에서 적응증만 확보해 금기 범위를 누락했으므로, 관찰상 이득 없이 `no_evidence`를 늘린 다중 evidence round는 production 기본값으로 채택하지 않았습니다.
+
+## 2026-08-22 production_tool_v3 token-budget holdout
+
+Trial 4의 4.05점과 17.5M tokens(input 16.7M / output 860.4K)를 기준으로, 모든 turn retrieval·전체 MCP schema 재전송·raw tool history 누적을 분리해 수정했습니다. Holdout은 prompt에 포함되지 않은 20개 질문으로 direct/retrieval을 10개씩 균형 구성했으며, 불완전한 지시어 대신 실제 검색 가능한 개체를 포함합니다.
+
+| 지표 | 결과 |
+|---|---:|
+| 전체 / routing | 20/20 / 20/20 |
+| Groundedness / citation correctness / completeness | 100% / 100% / 100% |
+| Unsupported addition / contradiction / deflection | 100% / 100% / 0% deflection rate |
+| no-evidence | 100% |
+| 총 token | 35,390 (input 28,240 / output 7,150) |
+| Direct / retrieval 평균 token | 1,972.9 / 1,566.1 |
+| 평균 latency | 4.905초 |
+
+- Prompt SHA-256: `3FB4E18385ADCA092BEDB0C88D3294988F1E4087BECDA11ED3F217DED51724C3`
+- Holdout cases SHA-256: `B5E6BD17DBF9CF7380B98E109ED464BEE92B5280DD4DFD58FAF8FE1C0D88107D`
+- Result SHA-256: `3642FDE2A157A77D5142D842AF2955BDAAA855E4908A37BBF08210B2387383C1`
+- 최종 Docker direct smoke: 2,212 tokens, 12.11초, `finish_reason=stop`.
+- 실제 MFDS retrieval smoke: 8,234 tokens, 24.18초, 숫자 citation 존재. v2의 19,977 tokens보다 58.8% 적습니다.
+
+구조적 제한은 query별 MCP schema 최대 8개, retrieval input 80,000자, retrieval model turn/MCP call 각각 4회, no-progress 3회, tool result 6,000자, 선택 source 4개, augmentation 3,000 token입니다. 이 holdout은 회귀 검증용이며 공식 dashboard 점수를 대체하지 않습니다.

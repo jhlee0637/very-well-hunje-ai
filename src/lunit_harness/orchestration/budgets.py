@@ -21,6 +21,7 @@ class RequestBudget:
     retrieval_invocations: int = 0
     retrieval_turns: int = 0
     mcp_tool_calls: int = 0
+    retrieval_input_chars: int = 0
 
     @property
     def deadline(self) -> float:
@@ -53,3 +54,17 @@ class RequestBudget:
         self.mcp_tool_calls += 1
         if self.mcp_tool_calls > self.settings.mcp_tool_call_limit:
             raise BudgetExceededError("MCP tool call limit exceeded")
+
+    def can_add_retrieval_input_chars(self, amount: int, *, reserve: int = 0) -> bool:
+        self.check_deadline()
+        if amount < 0 or reserve < 0:
+            raise ValueError("retrieval input character accounting must be non-negative")
+        return (
+            self.retrieval_input_chars + amount + reserve
+            <= self.settings.retrieval_input_char_limit
+        )
+
+    def add_retrieval_input_chars(self, amount: int) -> None:
+        if not self.can_add_retrieval_input_chars(amount):
+            raise BudgetExceededError("retrieval input character limit exceeded")
+        self.retrieval_input_chars += amount

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
 from typing import Any
 
@@ -11,6 +12,7 @@ from lunit_harness.citations.store import EvidenceStore
 from lunit_harness.clients.mcp_client import MCPClient
 from lunit_harness.clients.model_client import ModelClient
 from lunit_harness.config import Settings
+from lunit_harness.errors import MCPError, ModelProtocolError, ModelUpstreamError
 from lunit_harness.orchestration.budgets import BudgetExceededError, RequestBudget
 from lunit_harness.orchestration.conversation import assistant_message, load_prompt
 from lunit_harness.tools.executor import ToolExecutor, ToolValidationError
@@ -19,6 +21,9 @@ from lunit_harness.tools.finalize_retrieval import (
     finalize_retrieval,
 )
 from lunit_harness.tools.registry import FINALIZE_RETRIEVAL_NAME, ToolRegistry
+
+
+logger = logging.getLogger(__name__)
 
 
 FALLBACK_RETRIEVAL_PROMPT = """
@@ -59,18 +64,14 @@ class RetrievalPhase:
         fingerprints: dict[str, int] = {}
         try:
             registry = await ToolRegistry.load(self.mcp_client)
+        except MCPError as exc:
+            raise ModelUpstreamError("MCP tool discovery failed") from exc
         except Exception as exc:
-            return RetrievalOutcome(
-                selection=CitationSelection(
-                    status="no_evidence",
-                    note=f"Retrieval unavailable: {type(exc).__name__}",
-                ),
-                store=store,
-                usage=usage,
-            )
+            raise ModelProtocolError("Retrieval tool discovery failed") from exc
         executor = ToolExecutor(self.mcp_client, registry, self.settings)
         force_finalize = False
         evidence_rounds = 0
+        no_progress_rounds = 0
         messages: list[dict[str, Any]] = [
             {"role": "system", "content": self.prompt},
             {"role": "user", "content": query},
@@ -121,15 +122,54 @@ class RetrievalPhase:
                     budget.add_retrieval_turn()
                 except BudgetExceededError as exc:
                     return self._terminal_without_finalize(store, usage, str(exc))
-                tools = registry.openai_tools()
+                tools = registry.openai_tools(
+                    query, mcp_tool_limit=self.settings.retrieval_tool_limit
+                )
                 call_messages = messages
+
+            input_chars = self._payload_chars(call_messages, tools)
+            if force_finalize:
+                try:
+                    budget.add_retrieval_input_chars(input_chars)
+                except BudgetExceededError as exc:
+                    return self._terminal_without_finalize(store, usage, str(exc))
+            else:
+                finalize_reserve = min(
+                    16000, max(4000, self.settings.retrieval_input_char_limit // 4)
+                )
+                if not budget.can_add_retrieval_input_chars(
+                    input_chars, reserve=finalize_reserve
+                ):
+                    if len(store) == 0:
+                        return self._terminal_without_finalize(
+                            store, usage, "retrieval input budget exhausted without evidence"
+                        )
+                    force_finalize = True
+                    continue
+                budget.add_retrieval_input_chars(input_chars)
 
             response = await self.model_client.chat(
                 messages=call_messages,
                 tools=tools,
-                options={"temperature": 0.0, "max_tokens": self.settings.model_max_tokens},
+                options={
+                    "temperature": 0.0,
+                    "max_tokens": self.settings.retrieval_model_max_tokens,
+                },
             )
             self._add_usage(usage, response.get("usage"))
+            response_usage = response.get("usage") or {}
+            logger.info(
+                "model_phase=retrieval force_finalize=%s turn=%d tools=%d "
+                "input_chars=%d cumulative_input_chars=%d prompt_tokens=%s "
+                "completion_tokens=%s",
+                force_finalize,
+                budget.retrieval_turns,
+                len(tools),
+                input_chars,
+                budget.retrieval_input_chars,
+                response_usage.get("prompt_tokens", "unknown"),
+                response_usage.get("completion_tokens", "unknown"),
+            )
             message = assistant_message(response)
             messages.append(message)
             tool_calls = message.get("tool_calls") or []
@@ -150,6 +190,7 @@ class RetrievalPhase:
                 continue
 
             evidence_added_this_round = False
+            mcp_attempted_this_round = False
             for tool_call in tool_calls:
                 call_id = str(tool_call.get("id", "missing-tool-call-id"))
                 function = tool_call.get("function")
@@ -184,12 +225,15 @@ class RetrievalPhase:
 
                 try:
                     budget.add_mcp_tool_call()
+                    mcp_attempted_this_round = True
                     execution = await executor.execute(
                         name=str(name),
                         arguments=arguments,
                         fingerprints=fingerprints,
                         store=store,
                     )
+                    if execution.is_error:
+                        raise ModelUpstreamError("MCP tool execution failed")
                     evidence_added_this_round = (
                         evidence_added_this_round or execution.evidence_added > 0
                     )
@@ -210,6 +254,7 @@ class RetrievalPhase:
 
             if evidence_added_this_round:
                 evidence_rounds += 1
+                no_progress_rounds = 0
                 if evidence_rounds < self.settings.retrieval_evidence_round_limit:
                     messages.append(
                         {
@@ -222,17 +267,48 @@ class RetrievalPhase:
                             ),
                         }
                     )
-            if (
-                evidence_rounds >= self.settings.retrieval_evidence_round_limit
-                or budget.retrieval_turns >= self.settings.retrieval_turn_limit
+            elif mcp_attempted_this_round:
+                no_progress_rounds += 1
+                if no_progress_rounds >= self.settings.retrieval_no_progress_limit:
+                    if len(store) == 0:
+                        return self._terminal_without_finalize(
+                            store,
+                            usage,
+                            "retrieval stopped after repeated no-progress tool results",
+                        )
+                    force_finalize = True
+            if evidence_rounds >= self.settings.retrieval_evidence_round_limit:
+                force_finalize = True
+            elif (
+                budget.retrieval_turns >= self.settings.retrieval_turn_limit
                 or budget.mcp_tool_calls >= self.settings.mcp_tool_call_limit
             ):
+                if len(store) == 0:
+                    return self._terminal_without_finalize(
+                        store, usage, "retrieval budget exhausted without evidence"
+                    )
                 force_finalize = True
+
+    @staticmethod
+    def _payload_chars(
+        messages: list[dict[str, Any]], tools: list[dict[str, Any]]
+    ) -> int:
+        return len(
+            json.dumps(
+                {"messages": messages, "tools": tools},
+                ensure_ascii=False,
+                separators=(",", ":"),
+            )
+        )
 
     @staticmethod
     def _terminal_without_finalize(
         store: EvidenceStore, usage: dict[str, int], note: str
     ) -> RetrievalOutcome:
+        if len(store):
+            raise ModelProtocolError(
+                "Retrieval could not validate the evidence it collected"
+            )
         return RetrievalOutcome(
             selection=CitationSelection(
                 status="no_evidence",

@@ -138,6 +138,7 @@ Generation call에는 Generation 전용 system prompt와 `retrieve_relevant_cont
 - Query는 conversation 없이도 의미가 통하는 standalone 문장이어야 한다.
 - Generation이 최종 content를 반환하면 Retrieval 단계를 실행하지 않는다.
 - Generation이 retrieval을 요청하면 handler가 Retrieval subroutine 전체를 실행한다.
+- 일반·고수준 설명 신호가 있고 근거·정밀 검색 신호가 없으면 conservative code gate가 retrieval tool을 노출하지 않는다.
 - 첫 Retrieval invocation 뒤에는 Generation에서 retrieval tool을 제거해 재검색을 구조적으로 막는다.
 - 선택된 source가 있는데 최종 답변에 유효한 숫자 인용이 없으면 tool 없이 한 번만 교정 생성한다.
 - MVP에서는 한 Generation request의 retrieval invocation에 작은 명시적 상한을 둔다.
@@ -182,12 +183,14 @@ START
 - MCP tool call limit 도달
 - Request deadline 도달
 - 반복 tool call 또는 복구 불가능한 protocol 오류
+- Citable evidence 없이 연속 3회 무진전
+- 누적 직렬화 retrieval input 80,000자 도달
 
 첫 citable evidence가 저장되거나 탐색 budget 경계에 도달하면 누적 tool history를 버리고, 원 질의와 길이가 제한된 evidence catalog 및 `finalize_retrieval` 하나만 포함한 단일 compact finalization call을 실행한다. 이 call이 유효한 selection을 만들지 못해도 Python이 evidence를 임의 선택하지 않는다. 검증된 selection이 없으면 `no_evidence`로 종료하고 내부 note에 원인을 남긴다.
 
 ## 9. MCP tool 실행
 
-MCP client는 Streamable HTTP transport와 Bearer authentication을 캡슐화한다. Tool registry는 server가 실제로 제공한 schema를 기준으로 구성하며, model이 생성한 임의 tool name을 실행하지 않는다.
+MCP client는 Streamable HTTP transport와 Bearer authentication을 캡슐화한다. Tool registry는 server가 실제로 제공한 schema를 기준으로 구성하며, model이 생성한 임의 tool name을 실행하지 않는다. 질의 의도에 맞는 tool family를 선택해 한 model call에 MCP schema 최대 8개만 제공하고 `finalize_retrieval`을 추가한다.
 
 ### 실행 전 검증
 
@@ -298,6 +301,9 @@ Generation은 이 formatter가 반환한 tool result만 retrieved evidence로 �
 | Generation model call limit | Generation 재호출 폭주 방지 |
 | Retrieval invocation limit | 한 답변에서 반복 검색 방지 |
 | Retrieval model turn limit | Retrieval L2 loop 제한 |
+| Retrieval no-progress limit | Citable evidence 없는 반복 탐색 제한 |
+| Retrieval tool schema limit | 매 call에 직렬화하는 MCP schema 제한 |
+| Retrieval input character limit | 누적 prompt/tool-history 재전송 제한 |
 | MCP tool call limit | Tool fan-out 제한 |
 | Duplicate fingerprint limit | 동일 검색 반복 차단 |
 | Model timeout | Upstream L2 지연 제한 |
@@ -306,6 +312,7 @@ Generation은 이 formatter가 반환한 tool result만 retrieved evidence로 �
 | Source token limit | 단일 source 독점 방지 |
 | Augmentation token limit | Generation context 보호 |
 | Selected source limit | Citation 수와 context 크기 제한 |
+| Phase-specific output limit | Generation·retrieval·repair 출력 상한 분리 |
 
 초기 default는 실제 L2/MCP smoke latency와 확인된 model context window를 근거로 정한다. Default가 정해지기 전에도 hard limit 자체를 제거하지 않는다.
 
