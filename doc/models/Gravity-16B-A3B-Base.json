@@ -1,0 +1,184 @@
+{
+  "schema_version": 1,
+  "source": {
+    "model_id": "trillionlabs/Gravity-16B-A3B-Base",
+    "url": "https://huggingface.co/trillionlabs/Gravity-16B-A3B-Base",
+    "revision": "2b968cfd63c4b34c71b4f46599a584ddff6987f2",
+    "captured_at": "2026-08-21",
+    "license": "apache-2.0"
+  },
+  "purpose": {
+    "task": "text-generation",
+    "stage": "base-pretrained",
+    "instruction_tuned": false,
+    "safety_aligned": false,
+    "languages": ["English", "Korean"],
+    "domain_emphasis": ["STEM", "medical"],
+    "description": "Base causal language model pretrained from random weights on approximately 5.5 trillion tokens."
+  },
+  "relationship": {
+    "downstream_model": "learning-unit/L1-16B-A3B",
+    "is_hackathon_l2": false,
+    "note": "L1 is a medically specialized downstream model; Lunit/L2-preview has a separate retrieval/generation contract."
+  },
+  "architecture": {
+    "name": "GravityMoEForCausalLM",
+    "model_type": "gravity_moe",
+    "family": "DeepSeek-like sparse MoE with MLA",
+    "total_parameters_billions": 16.24,
+    "active_parameters_billions": 3.16,
+    "num_hidden_layers": 28,
+    "hidden_size": 2048,
+    "intermediate_size": 8192,
+    "moe_intermediate_size": 1408,
+    "num_attention_heads": 16,
+    "num_key_value_heads": 16,
+    "routed_experts": 64,
+    "shared_experts": 1,
+    "experts_per_token": 8,
+    "context_length": 32768,
+    "vocabulary_size": 151552,
+    "precision": "bfloat16"
+  },
+  "config": {
+    "architectures": ["GravityMoEForCausalLM"],
+    "model_type": "gravity_moe",
+    "auto_map": {
+      "AutoConfig": "configuration_gravity_moe.GravityMoEConfig",
+      "AutoModelForCausalLM": "modeling_gravity_moe.GravityMoEForCausalLM"
+    },
+    "vocab_size": 151552,
+    "hidden_size": 2048,
+    "intermediate_size": 8192,
+    "moe_intermediate_size": 1408,
+    "num_hidden_layers": 28,
+    "num_attention_heads": 16,
+    "num_key_value_heads": 16,
+    "q_lora_rank": null,
+    "kv_lora_rank": 512,
+    "qk_rope_head_dim": 64,
+    "qk_nope_head_dim": 128,
+    "v_head_dim": 128,
+    "n_routed_experts": 64,
+    "n_shared_experts": 1,
+    "num_experts_per_tok": 8,
+    "first_k_dense_replace": 1,
+    "moe_layer_freq": 1,
+    "routed_scaling_factor": 2.446,
+    "norm_topk_prob": true,
+    "scoring_func": "sigmoid",
+    "topk_method": "noaux_tc",
+    "n_group": 1,
+    "topk_group": 1,
+    "hidden_act": "silu",
+    "max_position_embeddings": 32768,
+    "initializer_range": 0.02,
+    "rms_norm_eps": 0.000001,
+    "use_cache": true,
+    "rope_theta": 1000000.0,
+    "rope_scaling": null,
+    "attention_bias": false,
+    "attention_dropout": 0.0,
+    "tie_word_embeddings": false,
+    "bos_token_id": 0,
+    "eos_token_id": 1,
+    "torch_dtype": "bfloat16"
+  },
+  "tokenizer": {
+    "family": "GLM-4.5",
+    "class": "PreTrainedTokenizerFast",
+    "vocabulary_size": 151552,
+    "config_model_max_length": 128000,
+    "effective_model_context_length": 32768,
+    "padding_side": "left",
+    "eos_token": "<|endoftext|>",
+    "pad_token": "<|endoftext|>",
+    "chat_template_present": false,
+    "warning": "Tokenizer metadata advertises 128000, but model config and card specify 32768. Use 32768 as the safe context limit.",
+    "notable_tokens": [
+      "<|system|>",
+      "<|user|>",
+      "<|assistant|>",
+      "<|observation|>",
+      "<think>",
+      "</think>",
+      "<tool_call>",
+      "</tool_call>",
+      "<tool_response>",
+      "</tool_response>",
+      "/nothink"
+    ]
+  },
+  "reported_benchmarks": [
+    {"category": "General Knowledge", "benchmark": "MMLU (5-shot)", "metric": "acc", "score": 73.0},
+    {"category": "General Knowledge", "benchmark": "Global MMLU (EN)", "metric": "acc", "score": 73.5},
+    {"category": "General Knowledge", "benchmark": "Global MMLU (KO)", "metric": "acc", "score": 65.8},
+    {"category": "Reasoning", "benchmark": "GPQA Main", "metric": "acc", "score": 38.4},
+    {"category": "Reasoning", "benchmark": "ARC-Challenge", "metric": "acc_norm", "score": 56.8},
+    {"category": "Reasoning", "benchmark": "HellaSwag", "metric": "acc_norm", "score": 77.9},
+    {"category": "Math", "benchmark": "GSM8K", "metric": "exact_match", "score": 71.3},
+    {"category": "Code", "benchmark": "HumanEval+", "metric": "pass@1", "score": 31.7},
+    {"category": "Code", "benchmark": "MBPP+", "metric": "pass@1", "score": 73.3},
+    {"category": "Medical", "benchmark": "MedQA (4 options)", "metric": "acc", "score": 63.4},
+    {"category": "Reading Comprehension", "benchmark": "CoQA", "metric": "F1", "score": 77.5}
+  ],
+  "upstream_files": [
+    {"path": ".gitattributes", "size_bytes": 1622, "git_oid": "14f52bca4b9bcb15d497ed21921558fc7c45c066", "mirrored": false},
+    {"path": "LICENSE", "size_bytes": 10756, "git_oid": "3ea2b0b6d43094a007323d8c73e8fd2f1b4872ed", "mirrored": false},
+    {"path": "README.md", "size_bytes": 7844, "git_oid": "bf9159b9b5cbf5f66bc5bdcb71428cfc7640f31f", "mirrored": false},
+    {"path": "base-banner.png", "size_bytes": 2310077, "xet_oid": "5c56a0bfac1870669b94e56448db1b07016640d52847638f01917c024df91682", "mirrored": false},
+    {"path": "config.json", "size_bytes": 1189, "git_oid": "98064cf09ad49aa4d0ee94bd71272974ad97cb63", "mirrored": false},
+    {"path": "configuration_gravity_moe.py", "size_bytes": 4020, "git_oid": "35ae65c5889925bde6d4c2f35b4eab4e2a73dab1", "mirrored": false},
+    {"path": "model-00001-of-00004.safetensors", "size_bytes": 10734324328, "xet_oid": "99c5616b387e39274eda3d9a17f7ca6e943be21dd4457133d560be62f49448f2", "mirrored": false},
+    {"path": "model-00002-of-00004.safetensors", "size_bytes": 10735117984, "xet_oid": "cab0e95e1a6c1b879fa87ebac5ae7693b25b7f94447905597c19bb227794bd06", "mirrored": false},
+    {"path": "model-00003-of-00004.safetensors", "size_bytes": 10394851840, "xet_oid": "5ff969e9ffccf54ecc812892b2fb5920920f0b6b838469bf2a4f098294c6b439", "mirrored": false},
+    {"path": "model-00004-of-00004.safetensors", "size_bytes": 620757088, "xet_oid": "ae9a7e7784b10f13fc0a3f67bde865979089a143e8ce10c2440aa500fb20c82c", "mirrored": false},
+    {"path": "model.safetensors.index.json", "size_bytes": 495391, "git_oid": "8d8716de9058f9409fd8745462d250d547bcb21a", "mirrored": false},
+    {"path": "modeling_gravity_moe.py", "size_bytes": 2009, "git_oid": "1e2adb23e918b28986f00bddd2419319da973019", "mirrored": false},
+    {"path": "special_tokens_map.json", "size_bytes": 802, "git_oid": "9028cf84013844f17d7616bdec1d88e977924434", "mirrored": false},
+    {"path": "tokenizer.json", "size_bytes": 19970700, "xet_oid": "bda8e2146c3bb7b7e0fc96dcc4f0aeff041c6c27952e3ace0665663ebff346ba", "mirrored": false},
+    {"path": "tokenizer_config.json", "size_bytes": 7311, "git_oid": "75e11cfb2e0cc09f19391ec2278b4825a4c3fae9", "mirrored": false}
+  ],
+  "weight_summary": {
+    "shard_count": 4,
+    "total_size_bytes": 32485051240,
+    "mirrored": false
+  },
+  "inspected_files": {
+    "config.json": {
+      "size_bytes": 1189,
+      "sha256": "1b55630887168b19c6b091831dbb66e54346bbb783cffbd1ea085a822fa41ba4"
+    },
+    "configuration_gravity_moe.py": {
+      "size_bytes": 4020,
+      "sha256": "7441dd4d25643a6823ab1a43c0e32bf17f13fd6caa156587c3a49a0673157740"
+    },
+    "modeling_gravity_moe.py": {
+      "size_bytes": 2009,
+      "sha256": "b428baa2f68c8c41a13de18182535561dc0e1de71546474d0799b8d56531f2cc"
+    },
+    "special_tokens_map.json": {
+      "size_bytes": 802,
+      "sha256": "290511061f3c229783aaa9b2d63698fdcffcc068890ce2e014275ebc6df1221a"
+    },
+    "tokenizer_config.json": {
+      "size_bytes": 7311,
+      "sha256": "14a3484d689dae8f6bf58c250617bfa95bd0c7404480cf3f3feb364f1f0394eb"
+    }
+  },
+  "limitations": [
+    "Base pretrained model without instruction tuning or safety alignment.",
+    "May generate factually incorrect, biased, or harmful content.",
+    "Performance may degrade on languages underrepresented in pretraining.",
+    "Maximum supported context length is 32768 tokens."
+  ],
+  "integration_notes": {
+    "requires_trust_remote_code": true,
+    "recommended_api_shape": "text completion",
+    "chat_template_present": false,
+    "generation_config_present": false,
+    "weights_mirrored": false,
+    "offline_evaluation_warning": "Do not download this model at evaluation runtime; the hackathon evaluation environment has no external network access."
+  }
+}
+

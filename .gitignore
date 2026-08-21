@@ -1,1 +1,9 @@
 secrets.json
+.env
+__pycache__/
+.pytest_cache/
+eval/reports/
+*.duckdb
+*.duckdb.wal
+AGENTS_A.md
+
