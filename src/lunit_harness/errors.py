@@ -59,7 +59,7 @@ class RequestDeadlineError(HarnessError):
 
 
 class MCPError(Exception):
-    """Internal retrieval error translated to a sanitized API-boundary failure."""
+    """Internal retrieval error that should normally degrade, not become API 5xx."""
 
     def __init__(self, code: str, message: str):
         super().__init__(message)
