@@ -1,0 +1,36 @@
+# Codex History — Jehee
+
+## 2026-08-21
+
+### Task: Offline RAG architecture review
+Action: Reviewed the deterministic, Python-controlled offline RAG specification, including DuckDB ingestion/retrieval, static context assembly, grounded generation, and CoEval regression testing.
+Result: Adopted the specification as the project direction. Confirmed that runtime autonomous agent loops are out of scope.
+
+### Task: Generation model review
+Action: Reviewed `trillionlabs/Gravity-16B-A3B-Base` and its medical instruction-tuned derivative `learning-unit/L1-16B-A3B`.
+Result: Identified that Gravity is a 16.24B total / approximately 3B-active base model rather than a 30B/A5B instruction model. Recommended L1 for medical chat and grounded RAG generation because Gravity Base is not instruction-tuned or safety-aligned.
+
+### Task: VS Code collaboration recommendation
+Action: Checked the official VS Code collaboration extension options.
+Result: Recommended Microsoft Visual Studio Live Share (`MS-vsliveshare.vsliveshare`) for online team development. Noted that the isolated evaluation environment must rely on a pre-merged local repository rather than Live Share.
+
+### Task: Project structure inspection
+Action: Inspected the workspace tree, project instructions, hackathon rules, ignore configuration, and Git status without reading or exposing secret values.
+Result: Confirmed that `main/` contains `AGENTS.md`, `.gitignore`, `secrets.json`, and documentation under `doc/`. No application source, tests, dependency manifest, Dockerfile, or Git metadata was detected. Confirmed that `secrets.json` is ignored.
+
+### Task: Development log policy change
+Action: Removed the previously created `DEV_LOG.md` at the user's request and stopped using that filename.
+Result: `DEV_LOG.md` no longer exists. No backup copy was retained.
+
+### Task: Notion history destination investigation
+Action: Tested the supplied Notion pages and compared the connected workspace with the workspace shown in the user's screenshot.
+Result: Found a workspace mismatch between the connected `J's Workspace` and the target `Lunit Hackathon` workspace. Notion logging was not performed, and no Notion content was changed.
+
+### Task: Local history log setup
+Action: Created `CODEX_HISTORY_JEHEE.log` in the project root as the replacement development-history destination.
+Result: Future Codex work for this project will be appended to this file in Task / Action / Result format. Secret values and sensitive credentials must never be logged.
+
+### Task: Publish project files to GitHub main
+Action: Confirmed the target repository as `jhlee0637/very-well-hunje-ai`, verified administrator and push access, initialized `main/` as a Git repository, and staged only the six approved non-secret files.
+Result: Prepared the initial `main` branch commit for publication. `secrets.json` remains excluded by `.gitignore` and is not staged.
+
