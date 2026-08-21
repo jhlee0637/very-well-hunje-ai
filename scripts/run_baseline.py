@@ -18,7 +18,12 @@ from urllib.request import Request, urlopen
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from prompting import GROUNDED_SYSTEM_PROMPT, MOCK_CONTEXT, build_grounded_messages  # noqa: E402
+from prompting import (  # noqa: E402
+    DEFAULT_CONTEXT_PATH,
+    GROUNDED_SYSTEM_PROMPT,
+    build_grounded_messages,
+    load_retrieval_context,
+)
 
 
 DEFAULT_INPUT = ROOT / "data" / "baseline_questions.jsonl"
@@ -52,7 +57,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--context-file",
         type=Path,
-        help="UTF-8 mock evidence file (defaults to the built-in mock guideline)",
+        help=f"UTF-8 retrieval JSON fixture (default: {DEFAULT_CONTEXT_PATH})",
     )
     return parser.parse_args()
 
@@ -90,7 +95,7 @@ def call_model(
     temperature: float,
     max_tokens: int,
     timeout: float,
-    context: str = MOCK_CONTEXT,
+    context: dict | None = None,
 ) -> tuple[dict, float]:
     payload = {
         "model": model,
@@ -124,7 +129,7 @@ def main() -> int:
     api_key = require_env("LUNIT_FM_API_KEY")
     model = require_env("LUNIT_FM_MODEL", "Lunit/L2-preview")
     questions = load_questions(args.input, args.limit)
-    context = args.context_file.read_text(encoding="utf-8") if args.context_file else MOCK_CONTEXT
+    context = load_retrieval_context(args.context_file or DEFAULT_CONTEXT_PATH)
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
