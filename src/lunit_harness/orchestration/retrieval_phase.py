@@ -153,7 +153,11 @@ class RetrievalPhase:
                 tools=tools,
                 options={
                     "temperature": 0.0,
-                    "max_tokens": self.settings.retrieval_model_max_tokens,
+                    "max_tokens": (
+                        self.settings.repair_model_max_tokens
+                        if force_finalize
+                        else self.settings.retrieval_model_max_tokens
+                    ),
                 },
             )
             self._add_usage(usage, response.get("usage"))
