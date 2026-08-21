@@ -31,6 +31,7 @@ Retrieval과 generation 프롬프트를 분리하고, Mock fixture를 고정 계
 - `generation/grounded_v2.md`: 이미 retrieval 결과를 받은 post-retrieval closed-book 후보입니다. 기존 결과를 보존하며 legacy 비교의 선택 프롬프트입니다.
 - `generation/production_tool_v1.md`: 모든 사용자 질문에 retrieval을 강제했던 보존용 baseline입니다.
 - `generation/production_tool_v2.md`: 일반 의료·비의료 질문은 직접 답하고 특정 근거·정밀 수치·희귀/비전형 사례만 독립형 query로 retrieval하는 production 후보입니다. Tool 결과 이후 숫자 citation과 closed-book 규칙은 유지합니다.
+- `generation/production_tool_v4.md`: HealthBench 품질 정합 후보입니다. 환자·보호자·임상의를 동적으로 구분하고 사용자 언어를 따르며, 임상적 정확성·완전성·맥락·소통을 token 최소화나 citation 형식보다 우선합니다. 검색 실패 시에도 검증되지 않은 정밀 사실은 만들지 않으면서 고신뢰 안전 조치와 필요한 확인 정보를 보존합니다.
 - `retrieval/grounded_v1.md`: generation에서 해소된 standalone query만 받습니다. 지시어가 남으면 추측하지 않고 `no_evidence`로 종료하며, budget 종료 시 `partial` 또는 `no_evidence`를 반드시 finalize합니다.
 
 ## 전송 모드
@@ -38,7 +39,7 @@ Retrieval과 generation 프롬프트를 분리하고, Mock fixture를 고정 계
 `eval/simulator_runner.py`는 두 grounded transport를 지원합니다.
 
 - `legacy`: fixture JSON과 질문을 한 user message에 결합합니다. 기본 prompt는 `grounded_v2.md`입니다.
-- `tool`: 첫 API 호출에 실제 tool schema를 전달하고 assistant의 direct answer 또는 standalone retrieval query를 기록합니다. Retrieval을 호출한 경우 fixture 계약을 공식 trajectory 텍스트로 직렬화한 tool-role 결과를 반환한 뒤, assistant tool call과 tool message를 모두 보존한 두 번째 API 호출에서 최종 답변을 생성합니다. 기본 prompt는 `production_tool_v2.md`입니다.
+- `tool`: 첫 API 호출에 실제 tool schema를 전달하고 assistant의 direct answer 또는 standalone retrieval query를 기록합니다. Retrieval을 호출한 경우 fixture 계약을 공식 trajectory 텍스트로 직렬화한 tool-role 결과를 반환한 뒤, assistant tool call과 tool message를 모두 보존한 두 번째 API 호출에서 최종 답변을 생성합니다. 평가 러너의 기본 prompt는 품질 A/B에서 선택된 `production_tool_v4.md`입니다.
 
 멀티턴 tool 모드는 모든 사용자 turn에서 retrieval을 새로 호출합니다. `그 약`, `그 증상`, `앞의 환자`를 해소한 query, turn별 evidence, 응답 citation과 citation-number-to-`cite_uid` 매핑을 기록합니다.
 
@@ -52,6 +53,53 @@ Retrieval과 generation 프롬프트를 분리하고, Mock fixture를 고정 계
 - Citation correctness는 번호가 실제 source에 존재하고, 금지 source가 아니며, 해당 문장의 구성 용어가 case의 source-support 용어와 연결되는지 검사합니다.
 - Deflection은 상담/의뢰 문자열의 존재 자체가 아니라 순서를 봅니다. 구체적인 초기 조치 뒤의 의뢰는 통과하고, 의뢰만 있거나 의뢰가 초기 조치보다 앞서면 실패합니다.
 - 이 지표는 deterministic smoke proxy이며 HealthBench 또는 임상의 평가를 대체하지 않습니다.
+
+## Quality-first 목표와 독립 평가
+
+Trial 5의 공식 9.60 이후 최적화 목표를 다음처럼 수정했습니다.
+
+1. 1차 목표: HealthBench형 weighted clinical rubric의 accuracy와 completeness.
+2. 2차 목표: patient/guardian/clinician persona와 다국어·multi-turn context awareness.
+3. 안전 제약: harmful advice, unsupported exact dose·regulatory fact, prompt injection 방지.
+4. 운영 제약: token budget은 무한 loop를 막는 상한이며 임상적으로 필요한 내용을 삭제하는 목표가 아님.
+
+새 평가 자산:
+
+- `eval/cases/quality_qa.jsonl`: 원본 single-turn 17건, quality rubric 83개.
+- `eval/cases/quality_multiturn.jsonl`: 위험도가 후속 turn에서 변하는 원본 multi-turn 5건.
+- axis: `accuracy`, `completeness`, `context_awareness`, `communication_quality`, `instruction_following`.
+- positive point와 penalty point를 HealthBench와 같은 가중식으로 합산하는 deterministic proxy.
+
+이 케이스는 공개 HealthBench 문항이나 hidden validation을 복제하지 않고 새로 작성했습니다. Regex rubric은 빠른 회귀 검출용이며 physician rubric 또는 LLM judge를 대체하지 않습니다. 내용 기준이 비어 있는 route holdout과 달리 모든 quality case는 다수의 임상 내용 기준을 가져야 합니다.
+
+```powershell
+# tool 없는 quality baseline: 프롬프트 자체의 임상 답변 품질 비교
+python eval/simulator_runner.py --mode baseline `
+  --prompt prompts/generation/production_tool_v4.md `
+  --cases eval/cases/quality_qa.jsonl
+
+# multi-turn context escalation
+python eval/simulator_runner.py --mode baseline --multiturn `
+  --prompt prompts/generation/production_tool_v4.md `
+  --cases eval/cases/quality_multiturn.jsonl
+```
+
+`production_tool_v4.md`의 helpful no-evidence와 non-destructive citation 정책을 production에 적용하려면 Team A의 current orchestration interface 확인이 필요합니다. Team A 작업이 main에 반영되기 전에는 Team A 소유 경로를 수정하지 않습니다.
+
+### 2026-08-22 quality A/B 결과
+
+동일한 `Lunit/L2-preview`, temperature `0.0`, max tokens `2048` 조건에서 v2와 v4를 비교했습니다. 아래 결과는 공식 dashboard 점수가 아니라 공개 benchmark를 복제하지 않은 원본 deterministic proxy입니다.
+
+| 평가 | Prompt | 통과 | 평균 quality rubric | 평균 지연 | 평균 응답 문자 | 총 token |
+|---|---|---:|---:|---:|---:|---:|
+| single-turn 17건 | v2 | 5/17 (29.4%) | 0.4024 | 16.810초 | 650.8 | 43,896 |
+| single-turn 17건 | v4 | 12/17 (70.6%) | 0.7552 | 17.269초 | 1,105.2 | 47,211 |
+| multi-turn 5건 | v2 | 4/5 (80.0%) | 0.8121 | 28.604초 | 856.8 | 31,952 |
+| multi-turn 5건 | v4 | 5/5 (100%) | 1.0000 | 45.018초 | 1,142.4 | 35,603 |
+
+v4는 single-turn quality를 `+0.3528`, multi-turn quality를 `+0.1879` 높였습니다. 총 token 증가는 각각 7.6%, 11.4%였습니다. 특히 multi-turn context-awareness는 0.75에서 1.00으로 상승했습니다. 따라서 현재 선택 후보는 v4이며, 응답 길이 증가는 임상 내용 누락을 줄이기 위한 허용 가능한 비용으로 판단합니다. 공식 Trial 5의 대규모 token 사용은 이 소규모 A/B의 증가율로 설명되지 않으므로, Team A 통합 후 tool 반복 호출·누적 transcript·검색 payload 크기를 별도로 계측해야 합니다.
+
+루브릭은 안전한 부정문을 위험 권고로 오인하지 않고 `숨을 쉬는지 확인`처럼 의미가 같은 한국어 표현을 인정하도록 회귀 테스트를 추가했습니다. 출력 문구를 정답 문자열에 맞추는 방식은 사용하지 않았습니다.
 
 ## 2026-08-21 실제 L2 결과
 
