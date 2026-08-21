@@ -8,6 +8,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from prompting import build_grounded_messages
+
 
 DEFAULT_API_URL = "https://model.hackathon.lunit.io"
 DEFAULT_MODEL = "Lunit/L2-preview"
@@ -24,6 +26,7 @@ def forward_chat(payload: dict, timeout: float = 180.0) -> tuple[int, dict]:
 
     upstream = dict(payload)
     upstream["model"] = model_name()
+    upstream["messages"] = build_grounded_messages(payload.get("messages", []))
     request = Request(
         f"{os.environ.get('LUNIT_FM_API_URL', DEFAULT_API_URL).rstrip('/')}/v1/chat/completions",
         data=json.dumps(upstream).encode("utf-8"),

@@ -43,6 +43,24 @@ python scripts/run_baseline.py --input data/my_questions.jsonl
 
 baseline은 응답 성공률, latency, token usage를 집계합니다. 실제 HealthBench 점수는 생성된 제출물을 Lunit dashboard에 제출해 확인해야 합니다.
 
+## Mock Context grounding test
+
+현재 드라이버와 로컬 하네스는 `prompting.py`의 `MOCK_CONTEXT`를 근거 문서로 주입합니다. 생성 프롬프트는 임상의를 대상으로 직접 답변하고, 의뢰 전 구체적인 1차 관리 지침을 제시하며, 문서 밖 내용을 추가하지 않고 모든 의학적 주장에 `[출처: 문서ID]`를 붙이도록 요구합니다.
+
+내장 Mock 문서로 한 문항을 확인하려면:
+
+```powershell
+py scripts/run_baseline.py --limit 1
+```
+
+코드를 수정하지 않고 다른 Mock 문서를 실험하려면 문서 본문에 `[문서ID: ID]`를 포함한 UTF-8 텍스트 파일을 넘깁니다.
+
+```powershell
+py scripts/run_baseline.py --limit 1 --context-file data/my_mock_context.txt
+```
+
+결과 JSONL에는 각 응답에 실제 사용한 `context`가 함께 기록되어 실험을 재현할 수 있습니다. 실제 retrieval이 연결되면 `prompting.build_grounded_messages`의 `context` 인자에 검색 결과를 전달하면 됩니다.
+
 ## Hackathon submission driver
 
 저장소 루트의 `Dockerfile`은 pure L2 baseline을 OpenAI-compatible service로 실행합니다.

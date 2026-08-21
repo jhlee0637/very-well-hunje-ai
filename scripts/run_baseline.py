@@ -16,11 +16,13 @@ from urllib.request import Request, urlopen
 
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from prompting import GROUNDED_SYSTEM_PROMPT, MOCK_CONTEXT, build_grounded_messages  # noqa: E402
+
+
 DEFAULT_INPUT = ROOT / "data" / "baseline_questions.jsonl"
-DEFAULT_SYSTEM_PROMPT = (
-    "You are a careful medical assistant. Answer the user's question directly and "
-    "accurately. State uncertainty when appropriate and clearly identify urgent red flags."
-)
+DEFAULT_SYSTEM_PROMPT = GROUNDED_SYSTEM_PROMPT
 
 
 def load_dotenv(path: Path) -> None:
@@ -47,6 +49,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument("--max-tokens", type=int, default=2048)
     parser.add_argument("--system-prompt", default=DEFAULT_SYSTEM_PROMPT)
+    parser.add_argument(
+        "--context-file",
+        type=Path,
+        help="UTF-8 mock evidence file (defaults to the built-in mock guideline)",
+    )
     return parser.parse_args()
 
 
@@ -83,13 +90,15 @@ def call_model(
     temperature: float,
     max_tokens: int,
     timeout: float,
+    context: str = MOCK_CONTEXT,
 ) -> tuple[dict, float]:
     payload = {
         "model": model,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": prompt},
-        ],
+        "messages": build_grounded_messages(
+            [{"role": "user", "content": prompt}],
+            context=context,
+            system_prompt=system_prompt,
+        ),
         "temperature": temperature,
         "max_tokens": max_tokens,
     }
@@ -115,6 +124,7 @@ def main() -> int:
     api_key = require_env("LUNIT_FM_API_KEY")
     model = require_env("LUNIT_FM_MODEL", "Lunit/L2-preview")
     questions = load_questions(args.input, args.limit)
+    context = args.context_file.read_text(encoding="utf-8") if args.context_file else MOCK_CONTEXT
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
@@ -130,7 +140,8 @@ def main() -> int:
                 "id": item["id"],
                 "prompt": item["prompt"],
                 "model": model,
-                "retrieval": False,
+                "retrieval": "mock",
+                "context": context,
             }
             try:
                 response, latency = call_model(
@@ -142,6 +153,7 @@ def main() -> int:
                     args.temperature,
                     args.max_tokens,
                     args.timeout,
+                    context,
                 )
                 usage = response.get("usage") or {}
                 record.update(
@@ -165,7 +177,7 @@ def main() -> int:
 
     summary = {
         "model": model,
-        "retrieval": False,
+        "retrieval": "mock",
         "input": str(args.input),
         "output": str(output_path),
         "total": len(questions),
