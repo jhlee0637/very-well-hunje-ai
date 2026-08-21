@@ -54,15 +54,6 @@ DIRECT_RESPONSE_INSTRUCTION = (
     "direct-answer rules in the system prompt and return only the final answer."
 )
 
-RETRIEVAL_QUERY_INSTRUCTION = (
-    "When using retrieve_relevant_content, preserve every requested facet and patient "
-    "detail from the preceding user message in one standalone query, including each "
-    "requested decision, medication, dose or threshold, time frame, and source "
-    "requirement. Do not omit one requested part to search only another. Use the "
-    "native function call; do not answer from memory when evidence is explicitly "
-    "requested."
-)
-
 
 class HarnessDriver:
     def __init__(
@@ -141,15 +132,6 @@ class HarnessDriver:
                 call_messages = [
                     *messages,
                     {"role": "user", "content": DIRECT_RESPONSE_INSTRUCTION},
-                ]
-            elif (
-                budget.generation_calls == 1
-                and retrieval_allowed_by_query
-                and budget.retrieval_invocations == 0
-            ):
-                call_messages = [
-                    *messages,
-                    {"role": "user", "content": RETRIEVAL_QUERY_INSTRUCTION},
                 ]
             input_chars = self._payload_chars(
                 call_messages, [RETRIEVE_TOOL] if allow_retrieval else []
