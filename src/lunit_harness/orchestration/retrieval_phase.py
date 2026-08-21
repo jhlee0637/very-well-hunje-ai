@@ -12,6 +12,7 @@ from lunit_harness.citations.store import EvidenceStore
 from lunit_harness.clients.mcp_client import MCPClient
 from lunit_harness.clients.model_client import ModelClient
 from lunit_harness.config import Settings
+from lunit_harness.errors import MCPError, ModelProtocolError, ModelUpstreamError
 from lunit_harness.orchestration.budgets import BudgetExceededError, RequestBudget
 from lunit_harness.orchestration.conversation import assistant_message, load_prompt
 from lunit_harness.tools.executor import ToolExecutor, ToolValidationError
@@ -63,15 +64,10 @@ class RetrievalPhase:
         fingerprints: dict[str, int] = {}
         try:
             registry = await ToolRegistry.load(self.mcp_client)
+        except MCPError as exc:
+            raise ModelUpstreamError("MCP tool discovery failed") from exc
         except Exception as exc:
-            return RetrievalOutcome(
-                selection=CitationSelection(
-                    status="no_evidence",
-                    note=f"Retrieval unavailable: {type(exc).__name__}",
-                ),
-                store=store,
-                usage=usage,
-            )
+            raise ModelProtocolError("Retrieval tool discovery failed") from exc
         executor = ToolExecutor(self.mcp_client, registry, self.settings)
         force_finalize = False
         evidence_rounds = 0
@@ -236,6 +232,8 @@ class RetrievalPhase:
                         fingerprints=fingerprints,
                         store=store,
                     )
+                    if execution.is_error:
+                        raise ModelUpstreamError("MCP tool execution failed")
                     evidence_added_this_round = (
                         evidence_added_this_round or execution.evidence_added > 0
                     )
@@ -307,6 +305,10 @@ class RetrievalPhase:
     def _terminal_without_finalize(
         store: EvidenceStore, usage: dict[str, int], note: str
     ) -> RetrievalOutcome:
+        if len(store):
+            raise ModelProtocolError(
+                "Retrieval could not validate the evidence it collected"
+            )
         return RetrievalOutcome(
             selection=CitationSelection(
                 status="no_evidence",
