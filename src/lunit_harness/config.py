@@ -56,6 +56,7 @@ class Settings:
     generation_call_limit: int
     retrieval_invocation_limit: int
     retrieval_turn_limit: int
+    retrieval_evidence_round_limit: int
     mcp_tool_call_limit: int
     duplicate_tool_call_limit: int
     selected_source_limit: int
@@ -90,6 +91,9 @@ class Settings:
                 "LUNIT_RETRIEVAL_INVOCATION_LIMIT", 1
             ),
             retrieval_turn_limit=_positive_int("LUNIT_RETRIEVAL_TURN_LIMIT", 8),
+            retrieval_evidence_round_limit=_positive_int(
+                "LUNIT_RETRIEVAL_EVIDENCE_ROUND_LIMIT", 1
+            ),
             mcp_tool_call_limit=_positive_int("LUNIT_MCP_TOOL_CALL_LIMIT", 8),
             duplicate_tool_call_limit=_positive_int(
                 "LUNIT_DUPLICATE_TOOL_CALL_LIMIT", 1

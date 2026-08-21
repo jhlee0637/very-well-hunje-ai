@@ -14,7 +14,7 @@ POST /v1/chat/completions
   → 최종 답변
 ```
 
-검색과 원문 청킹은 Lunit MCP가 담당합니다. MVP에는 DuckDB 재청킹이나 별도 벡터 DB를 넣지 않습니다. Python은 모델의 도구 호출을 실행하는 유한 상태 머신이며, 호출 횟수·중복 호출·컨텍스트 크기·전체 요청 시간을 제한합니다. 상세 계약은 [doc/ARCHITECTURE.md](doc/ARCHITECTURE.md)를 참고하세요.
+검색과 원문 청킹은 Lunit MCP가 담당합니다. MVP에는 DuckDB 재청킹이나 별도 벡터 DB를 넣지 않습니다. Python은 모델의 도구 호출을 실행하는 유한 상태 머신이며, evidence round, 호출 횟수, 중복 호출, 컨텍스트 크기와 전체 요청 시간을 제한합니다. Production 기본 evidence round는 live 검증에서 가장 안정적이었던 1이며, `LUNIT_RETRIEVAL_EVIDENCE_ROUND_LIMIT`으로만 실험적으로 늘릴 수 있습니다. 상세 계약은 [doc/ARCHITECTURE.md](doc/ARCHITECTURE.md)를 참고하세요.
 
 ## 주요 디렉터리
 
@@ -78,12 +78,14 @@ docker build --secret id=custom_ca,src=C:\path\to\local-root-ca.crt -t lunit-tea
 
 ## Team B 프롬프트 연결
 
-Team B가 선택한 `production_tool_v1.md`와 `grounded_v1.md`를 LF 기준 재현 해시로 통합했습니다. Docker image는 두 파일을 allowlist로 복사하고 아래 경로를 기본값으로 사용합니다.
+Team B가 선택한 조건부 검색 `production_tool_v2.md`와 `grounded_v1.md`를 통합했습니다. 비교와 롤백을 위해 `production_tool_v1.md`도 보존하며, Docker image는 필요한 파일만 allowlist로 복사하고 아래 경로를 기본값으로 사용합니다.
 
 ```text
-LUNIT_GENERATION_PROMPT_PATH=/app/prompts/generation/production_tool_v1.md
+LUNIT_GENERATION_PROMPT_PATH=/app/prompts/generation/production_tool_v2.md
 LUNIT_RETRIEVAL_PROMPT_PATH=/app/prompts/retrieval/grounded_v1.md
 ```
+
+v2는 일반 의료·비의료 질문에는 직접 답하고, 특정 guideline·법률·급여·허가·라벨·최신 문헌·정확한 수치·citation 또는 희귀/비전형/금기 사례에만 검색을 한 번 수행합니다. Tool 결과 이후의 근거 제한, 숫자 인용, `partial`/`no_evidence`, prompt-injection 방어 계약은 유지합니다.
 
 Generation 모델에는 `retrieve_relevant_content`만 보입니다. Retrieval 모델에는 MCP 도구와 로컬 `finalize_retrieval`만 보입니다. `no_evidence` 또는 빈 source는 모델을 다시 호출하지 않고 `제공된 문서에서 확인할 수 없음`으로 종료하며, 근거가 있으면 모든 문장과 bullet 끝의 유효 숫자 인용을 검사하고 한 번만 교정합니다. 교정 후에도 누락된 문장은 삭제하고 유효 인용 문장만 보존하며, 인용을 임의로 추가하지 않습니다. 유효한 evaluator 요청 중 runtime credential, L2/MCP 연결 또는 deadline 문제가 발생하면 같은 고정 문구를 OpenAI-compatible HTTP 200 completion으로 반환하고 `X-Lunit-Degraded: true`를 표시합니다. 잘못된 요청은 계속 4xx로 거부합니다.
 
