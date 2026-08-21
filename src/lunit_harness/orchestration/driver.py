@@ -47,6 +47,13 @@ End every medical sentence or bullet with an allowed numeric citation.
 Do not call tools, invent facts or citations, add a source list, or discuss the repair.
 """.strip()
 
+DIRECT_RESPONSE_INSTRUCTION = (
+    "Answer the preceding user question directly now in the same language as the "
+    "user. Retrieval is intentionally unavailable for this request. Do not output "
+    "a tool name, pseudo-tool markup, XML, or function-call syntax. Follow the "
+    "direct-answer rules in the system prompt and return only the final answer."
+)
+
 
 class HarnessDriver:
     def __init__(
@@ -116,11 +123,21 @@ class HarnessDriver:
                 else self.settings.model_max_tokens
             )
             call_options = self._bounded_options(options, generation_limit)
+            call_messages = messages
+            if (
+                budget.generation_calls == 1
+                and not retrieval_allowed_by_query
+                and budget.retrieval_invocations == 0
+            ):
+                call_messages = [
+                    *messages,
+                    {"role": "user", "content": DIRECT_RESPONSE_INSTRUCTION},
+                ]
             input_chars = self._payload_chars(
-                messages, [RETRIEVE_TOOL] if allow_retrieval else []
+                call_messages, [RETRIEVE_TOOL] if allow_retrieval else []
             )
             response = await self.generation.call(
-                messages,
+                call_messages,
                 call_options,
                 allow_retrieval=allow_retrieval,
             )
