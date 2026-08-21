@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import re
 
 from lunit_harness.citations.models import (
@@ -16,6 +17,7 @@ from lunit_harness.config import Settings
 
 
 SENTENCE_BOUNDARY = re.compile(r"(?<=[.!?。！？])\s+|(?<=다\.)\s+|\n\n+")
+logger = logging.getLogger(__name__)
 
 
 def estimate_tokens(text: str) -> int:
@@ -87,6 +89,15 @@ class CitationFormatter:
             note = note or "No validated citation evidence was selected."
         elif status == "no_evidence":
             status = "partial"
+        logger.info(
+            "augmentation status=%s selector_items=%d selected_sources=%d "
+            "content_chars=%d estimated_tokens=%d",
+            status,
+            len(selection.items),
+            len(sources),
+            sum(len(source.content) for source in sources),
+            used_tokens,
+        )
         return RetrievalResult(status=status, note=note, sources=tuple(sources))
 
     def as_tool_content(

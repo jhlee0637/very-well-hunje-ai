@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 from dataclasses import dataclass
@@ -62,6 +63,7 @@ class RetrievalPhase:
         store = EvidenceStore()
         usage: dict[str, int] = {}
         fingerprints: dict[str, int] = {}
+        query_hash = hashlib.sha256(query.encode("utf-8")).hexdigest()[:16]
         try:
             registry = await ToolRegistry.load(self.mcp_client)
         except MCPError as exc:
@@ -79,20 +81,25 @@ class RetrievalPhase:
 
         while True:
             if force_finalize:
-                evidence_catalog = [
-                    {
-                        "cite_uid": evidence.cite_uid,
-                        "source_type": evidence.source_type,
-                        "title": evidence.title,
-                        "retrieval_score": evidence.relevance_score,
-                        "content": evidence.content[
-                            : self.settings.source_token_limit * 2
-                        ],
-                    }
-                    for evidence in store.values()[
-                        : self.settings.selected_source_limit
-                    ]
-                ]
+                candidate_limit = self.settings.selected_source_limit * 2
+                catalog_content_budget = (
+                    self.settings.selected_source_limit
+                    * self.settings.source_token_limit
+                    * 2
+                )
+                evidence_catalog = store.selector_candidates(
+                    query,
+                    limit=candidate_limit,
+                    total_content_chars=catalog_content_budget,
+                )
+                logger.info(
+                    "retrieval_selector query_hash=%s collected=%d candidates=%d "
+                    "catalog_content_chars=%d",
+                    query_hash,
+                    len(store),
+                    len(evidence_catalog),
+                    sum(len(item["content"]) for item in evidence_catalog),
+                )
                 call_messages = [
                     {
                         "role": "system",
@@ -236,6 +243,15 @@ class RetrievalPhase:
                         raise ModelUpstreamError("MCP tool execution failed")
                     evidence_added_this_round = (
                         evidence_added_this_round or execution.evidence_added > 0
+                    )
+                    logger.info(
+                        "mcp_phase=retrieval query_hash=%s call=%d "
+                        "fingerprint=sha256:%s evidence_added=%d collected=%d",
+                        query_hash,
+                        budget.mcp_tool_calls,
+                        execution.fingerprint[:16],
+                        execution.evidence_added,
+                        len(store),
                     )
                     messages.append(
                         {
