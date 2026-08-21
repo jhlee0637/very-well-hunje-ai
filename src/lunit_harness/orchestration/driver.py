@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any
 
 from lunit_harness.citations.formatter import CitationFormatter
@@ -13,10 +14,12 @@ from lunit_harness.errors import InvalidRequestError, ModelProtocolError
 from lunit_harness.orchestration.budgets import BudgetExceededError, RequestBudget
 from lunit_harness.orchestration.conversation import assistant_message
 from lunit_harness.orchestration.generation_phase import (
+    RETRIEVE_TOOL,
     RETRIEVE_TOOL_NAME,
     GenerationPhase,
 )
 from lunit_harness.orchestration.retrieval_phase import RetrievalPhase
+from lunit_harness.orchestration.routing import should_offer_retrieval
 from lunit_harness.tools.retrieve_relevant_content import RetrieveRelevantContent
 from lunit_harness.validation.citations import (
     citations_complete,
@@ -25,6 +28,14 @@ from lunit_harness.validation.citations import (
 
 
 NO_EVIDENCE_RESPONSE = "제공된 문서에서 확인할 수 없음"
+logger = logging.getLogger(__name__)
+
+CITATION_REPAIR_PROMPT = """
+You repair one evidence-grounded Korean clinical answer.
+Use only the supplied evidence. Keep only claims directly supported by it.
+End every medical sentence or bullet with an allowed numeric citation.
+Do not call tools, invent facts or citations, add a source list, or discuss the repair.
+""".strip()
 
 
 class HarnessDriver:
@@ -73,6 +84,9 @@ class HarnessDriver:
         empty_response_retry_attempted = False
         citation_repair_attempted = False
         citation_repair_fallback = ""
+        retrieval_query = ""
+        retrieval_tool_content = ""
+        retrieval_allowed_by_query = should_offer_retrieval(input_messages)
 
         while True:
             try:
@@ -81,15 +95,37 @@ class HarnessDriver:
                 raise ModelProtocolError(
                     "Generation did not produce a final answer within its call limit"
                 ) from exc
+            allow_retrieval = (
+                retrieval_allowed_by_query
+                and budget.retrieval_invocations
+                < self.settings.retrieval_invocation_limit
+            )
+            generation_limit = (
+                self.settings.repair_model_max_tokens
+                if citation_repair_attempted
+                else self.settings.model_max_tokens
+            )
+            call_options = self._bounded_options(options, generation_limit)
+            input_chars = self._payload_chars(
+                messages, [RETRIEVE_TOOL] if allow_retrieval else []
+            )
             response = await self.generation.call(
                 messages,
-                options,
-                allow_retrieval=(
-                    budget.retrieval_invocations
-                    < self.settings.retrieval_invocation_limit
-                ),
+                call_options,
+                allow_retrieval=allow_retrieval,
             )
             self._add_usage(aggregate_usage, response.get("usage"))
+            response_usage = response.get("usage") or {}
+            logger.info(
+                "model_phase=%s call=%d allow_retrieval=%s input_chars=%d "
+                "prompt_tokens=%s completion_tokens=%s",
+                "repair" if citation_repair_attempted else "generation",
+                budget.generation_calls,
+                allow_retrieval,
+                input_chars,
+                response_usage.get("prompt_tokens", "unknown"),
+                response_usage.get("completion_tokens", "unknown"),
+            )
             message = assistant_message(response)
             messages.append(message)
             tool_calls = message.get("tool_calls") or []
@@ -137,19 +173,11 @@ class HarnessDriver:
                     labels = " ".join(
                         f"[{number}]" for number in sorted(available_citations)
                     )
-                    messages.append(
-                        {
-                            "role": "user",
-                            "content": (
-                                "Rewrite the previous draft as the final answer. "
-                                "Split the answer so each sentence or bullet contains "
-                                "one major medical claim, and end every such sentence "
-                                "or bullet with a directly supporting available numeric "
-                                "citation. Use only available sources, add no unsupported "
-                                "claims, and do not call tools. Available citations: "
-                                + labels
-                            ),
-                        }
+                    messages = self._citation_repair_messages(
+                        query=retrieval_query,
+                        evidence=retrieval_tool_content,
+                        draft=content,
+                        labels=labels,
                     )
                     continue
                 final = dict(response)
@@ -183,6 +211,8 @@ class HarnessDriver:
                 try:
                     budget.add_retrieval_invocation()
                     output = await self.retrieve(query.strip(), budget)
+                    retrieval_query = query.strip()
+                    retrieval_tool_content = output.content
                     self._add_usage(aggregate_usage, output.usage)
                     if self._is_no_evidence_tool_content(output.content):
                         return self._no_evidence_response(response, aggregate_usage)
@@ -218,6 +248,51 @@ class HarnessDriver:
                     )
                 except BudgetExceededError:
                     return self._no_evidence_response(response, aggregate_usage)
+
+    @staticmethod
+    def _bounded_options(options: dict[str, Any], token_limit: int) -> dict[str, Any]:
+        bounded = dict(options)
+        if "max_completion_tokens" in bounded:
+            bounded["max_completion_tokens"] = min(
+                int(bounded["max_completion_tokens"]), token_limit
+            )
+            bounded.pop("max_tokens", None)
+        else:
+            requested = bounded.get("max_tokens", token_limit)
+            bounded["max_tokens"] = min(int(requested), token_limit)
+        return bounded
+
+    @staticmethod
+    def _payload_chars(
+        messages: list[dict[str, Any]], tools: list[dict[str, Any]]
+    ) -> int:
+        return len(
+            json.dumps(
+                {"messages": messages, "tools": tools},
+                ensure_ascii=False,
+                separators=(",", ":"),
+            )
+        )
+
+    @staticmethod
+    def _citation_repair_messages(
+        *, query: str, evidence: str, draft: str, labels: str
+    ) -> list[dict[str, Any]]:
+        repair_input = {
+            "question": query,
+            "allowed_citations": labels,
+            "evidence": evidence,
+            "draft": draft,
+        }
+        return [
+            {"role": "system", "content": CITATION_REPAIR_PROMPT},
+            {
+                "role": "user",
+                "content": json.dumps(
+                    repair_input, ensure_ascii=False, separators=(",", ":")
+                ),
+            },
+        ]
 
     @staticmethod
     def _citation_numbers(tool_content: str) -> set[int]:
