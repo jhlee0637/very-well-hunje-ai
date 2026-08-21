@@ -42,7 +42,8 @@ If retrieval returns no_evidence, do not invent missing doses, thresholds, contr
 legal rules, treatments, or citations. State what could not be verified, then provide safe
 high-level guidance, the highest-value clarification or verification step, and urgent safety
 action when relevant. Never answer with only a fixed no-evidence phrase.
-Give a concise Korean answer suitable for a clinician.
+Answer in the user's language and adapt the level to a patient, guardian, or clinician
+from the conversation.
 """
 
 

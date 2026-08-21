@@ -16,9 +16,14 @@ DIRECT_SIGNALS = (
     "무엇인지",
     "필요 없습니다",
     "필요하지 않",
+    "간단히",
+    "짧게",
+    "한 문단",
     "general overview",
     "high-level",
     "definition",
+    "briefly",
+    "concise",
 )
 
 RETRIEVAL_SIGNALS = (

@@ -30,6 +30,7 @@ def main() -> int:
         "prompts/generation/production_tool_v1.md",
         "prompts/generation/production_tool_v2.md",
         "prompts/generation/production_tool_v3.md",
+        "prompts/generation/production_tool_v4.md",
         "prompts/retrieval/grounded_v1.md",
         "src/lunit_harness/api/routes.py",
         "src/lunit_harness/orchestration/driver.py",

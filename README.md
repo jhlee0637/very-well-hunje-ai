@@ -78,18 +78,18 @@ docker build --secret id=custom_ca,src=C:\path\to\local-root-ca.crt -t lunit-tea
 
 ## Team B 프롬프트 연결
 
-Team B가 선택한 조건부 검색 `production_tool_v3.md`와 `grounded_v1.md`를 통합했습니다. 비교와 롤백을 위해 v1·v2도 보존하며, Docker image는 필요한 파일만 allowlist로 복사하고 아래 경로를 기본값으로 사용합니다.
+Team B가 품질 A/B에서 선택한 `production_tool_v4.md`와 `grounded_v1.md`를 통합했습니다. 비교와 롤백을 위해 v1·v2·v3도 보존하며, Docker image는 필요한 파일만 allowlist로 복사하고 아래 경로를 기본값으로 사용합니다.
 
 ```text
-LUNIT_GENERATION_PROMPT_PATH=/app/prompts/generation/production_tool_v3.md
+LUNIT_GENERATION_PROMPT_PATH=/app/prompts/generation/production_tool_v4.md
 LUNIT_RETRIEVAL_PROMPT_PATH=/app/prompts/retrieval/grounded_v1.md
 ```
 
-v3는 일반 의료·비의료 질문에는 직접 답하고, 특정 guideline·법률·급여·허가·라벨·최신 문헌·정확한 수치·citation 또는 희귀/비전형/금기 사례에만 검색을 한 번 수행합니다. 명백한 일반·고수준 설명은 코드 게이트에서도 retrieval tool을 숨기고, 나머지는 L2가 최종 routing을 결정합니다. Tool 결과 이후의 근거 제한, 숫자 인용, `partial`/`no_evidence`, prompt-injection 방어 계약은 유지합니다.
+v4는 일반 의료·비의료 질문에는 직접 답하고, 근거가 실제로 필요한 복잡한 환자별 결정과 특정 guideline·법률·급여·허가·라벨·최신 문헌·정확한 수치·citation 질문에만 검색을 한 번 수행합니다. 환자·보호자·임상의를 대화에서 구분하고 사용자의 언어를 따르며, 명백한 일반·고수준 설명은 코드 게이트에서도 retrieval tool을 숨깁니다. Tool 결과 이후의 근거 제한, 숫자 인용, `partial`/`no_evidence`, prompt-injection 방어 계약은 유지합니다.
 
-Generation 모델에는 `retrieve_relevant_content`만 보입니다. Retrieval 모델에는 MCP 도구와 로컬 `finalize_retrieval`만 보입니다. `no_evidence` 또는 빈 source는 모델을 다시 호출하지 않고 `제공된 문서에서 확인할 수 없음`으로 종료하며, 근거가 있으면 모든 문장과 bullet 끝의 유효 숫자 인용을 검사하고 한 번만 교정합니다. 교정 후에도 누락된 문장은 삭제하고 유효 인용 문장만 보존하며, 인용을 임의로 추가하지 않습니다. 유효한 evaluator 요청 중 runtime credential, L2/MCP 연결 또는 deadline 문제가 발생하면 같은 고정 문구를 OpenAI-compatible HTTP 200 completion으로 반환하고 `X-Lunit-Degraded: true`를 표시합니다. 잘못된 요청은 계속 4xx로 거부합니다.
+Generation 모델에는 `retrieve_relevant_content`만 보입니다. Retrieval 모델에는 MCP 도구와 로컬 `finalize_retrieval`만 보입니다. 정상 검색의 `no_evidence` 또는 빈 source는 확인하지 못한 범위를 밝힌 뒤 안전한 일반 조치·확인 단계·응급 경고를 제공하는 final Generation으로 이어지며, 정확한 수치나 citation을 만들지 않습니다. 근거가 있으면 모든 문장과 bullet 끝의 유효 숫자 인용을 검사하고 한 번만 교정합니다. 교정 후에도 불완전하면 검증된 인용 문장을 보존하고, 인용을 임의로 추가하지 않습니다. Credential, L2/MCP 연결, protocol 또는 deadline 문제는 임상적 `no_evidence`로 위장하지 않고 sanitized OpenAI-compatible 5xx 오류로 구분합니다. 잘못된 요청은 계속 4xx로 거부합니다.
 
-Retrieval은 질의 의도에 맞는 MCP schema 최대 8개만 노출하며, model turn 4회·MCP call 4회·무진전 3회·누적 직렬화 입력 80,000자에서 중단합니다. Tool result는 6,000자, 선택 source는 4개, source당 800 token, augmentation은 3,000 token으로 제한합니다. Generation·retrieval·citation repair 출력 상한은 각각 1,024·512·768 token이고 repair에는 전체 대화를 재전송하지 않습니다.
+Retrieval은 질의 의도에 맞는 MCP schema 최대 8개만 노출하며, model turn 4회·MCP call 4회·무진전 3회·누적 직렬화 입력 80,000자에서 중단합니다. Tool result는 6,000자, 선택 source는 4개, source당 800 token, augmentation은 3,000 token으로 제한합니다. Generation·retrieval·citation repair 출력 상한은 각각 2,048·512·768 token이고 repair에는 전체 대화를 재전송하지 않습니다. 최종 Generation 상한은 v4의 기존 27회 품질 평가 호출 중 15회가 1,024 token을 초과한 측정에 따라 복원했습니다.
 
 ## 2026-08-22 토큰 예산 hotfix 검증
 
@@ -97,14 +97,26 @@ Retrieval은 질의 의도에 맞는 MCP schema 최대 8개만 노출하며, mod
 - Holdout 총 사용량: 35,390 tokens(input 28,240 / output 7,150), 평균 latency 4.905초.
 - 최종 Docker direct smoke: 2,212 tokens, 12.11초, `finish_reason=stop`, retrieval·citation 없음.
 - 실제 MFDS retrieval smoke: 8,234 tokens, 24.18초, 숫자 citation 존재. 이전 v2 smoke 19,977 tokens 대비 58.8% 감소했습니다.
-- 자동 테스트 64개 통과. Prompt/case와 결과 SHA는 `prompts/README.md`에 기록합니다.
+- Team A main 통합 전 자동 테스트 66개 통과. Prompt/case와 결과 SHA는 `prompts/README.md`에 기록합니다.
 
 이 결과는 로컬 L2/MCP smoke와 독립 fixture holdout이며 공식 dashboard 점수는 아닙니다. Trial 4의 4.05 및 17.5M tokens는 hotfix 전 비교 기준으로만 사용합니다.
+
+## 2026-08-22 Team A main 통합 후 v4 검증
+
+- Team A `c617ea7`의 bounded retrieval·conditional routing·compact finalization을 `Dev-hun`의 v4 prompt와 통합했습니다.
+- 첫 v4 holdout은 14/20(70%)이었고, 실패 응답에서 no-evidence 이후 정확한 용량·목표 수치·치료 단계가 생성되는 문제를 확인했습니다.
+- 안전 guard 적용 후 전체 20건이 오류 없이 완료되어 18/20(90%)을 통과했습니다. Citation correctness/completeness, unsupported addition, contradiction, deflection은 100%, groundedness·no-evidence·routing은 각각 95%였습니다.
+- 남은 두 실패는 일반적인 "간단히 설명" 요청의 불필요한 retrieval과 불완전한 no-evidence 고지였습니다. 일반화된 routing/disclosure 조건으로 수정한 실제 L2 targeted 회귀는 2/2 통과했습니다.
+- 20건 전체 실행은 99,556 tokens(input 77,949 / output 21,607), 평균 latency 17.034초였습니다. Guard 이전 76,254 tokens보다 증가한 부분은 no-evidence 보정 호출 비용이므로, 공식 결과에서 안전성 이득과 함께 계속 관찰합니다.
+
+위 수치는 prompt에 문항 답을 포함하지 않은 원본 route holdout 및 fixture 기반 로컬 결과이며 공식 dashboard 점수가 아닙니다.
 
 ## 통합 회귀 결과
 
 - Team B production prompt/case 해시는 handoff manifest와 일치합니다.
-- Production driver 자동 테스트 44개와 preflight 8개 항목이 모두 통과했습니다.
+- 애플리케이션 자동 테스트 73개와 평가 루브릭 테스트 6개, 합계 79개가 통과했습니다. Preflight는 6 pass, 0 fail이며 현재 Codex Python 프로세스에서 credential 미주입과 Docker CLI 자동 탐지 실패를 warning으로 보고했습니다.
+- 사용자 설치 Docker 29.7.2 Linux engine에서 image를 19.2초에 빌드했습니다. Direct smoke는 2,500 tokens와 604자 응답으로 종료됐고, 실제 MFDS retrieval smoke는 16,245 tokens와 숫자 citation을 반환했습니다.
+- MFDS smoke에서 citation fallback이 15,735 tokens를 쓰고도 핵심 내용을 66자로 축소하는 회귀를 발견했습니다. Unknown citation label만 제거하고 내용은 보존하도록 바꾼 뒤 동일 질문이 397자로 회복됐으며 token 증가는 3.2%였습니다.
 - Docker 실제 단일 턴과 지시어를 포함한 후속 턴은 HTTP 200, non-empty content, `finish_reason=stop`, 숫자 인용으로 통과했습니다.
 - Team B raw prompt runner 재실행은 단일 턴 3/7, 다중 턴 0/3이었으며, 주요 실패 축은 sentence-level citation completeness였습니다. 이 raw runner는 production driver의 bounded repair와 deterministic filtering을 적용하지 않은 prompt-only 기준선입니다.
 
