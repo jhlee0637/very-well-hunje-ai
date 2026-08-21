@@ -38,3 +38,7 @@ Result: Prepared the initial `main` branch commit for publication. `secrets.json
 Action: Published the six approved files through the authenticated GitHub connection after the local HTTPS push encountered a certificate-chain error, then fetched each remote file from `main` for verification.
 Result: Publication succeeded on `jhlee0637/very-well-hunje-ai` `main`. All six expected files are present, and `secrets.json` is absent.
 
+### Task: Update main branch repository instructions
+Action: Reviewed the updated `AGENTS.md`, verified that `secrets.json` remained ignored, and published the commit-message and prior-history review requirements with a detailed commit message.
+Result: Updated `AGENTS.md` on `jhlee0637/very-well-hunje-ai` `main` in commit `828b117780d2e4fd69be0c05bae48ba7a2ce921f`.
+
