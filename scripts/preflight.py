@@ -28,6 +28,7 @@ def main() -> int:
         "requirements.txt",
         "app.py",
         "prompts/generation/production_tool_v1.md",
+        "prompts/generation/production_tool_v2.md",
         "prompts/retrieval/grounded_v1.md",
         "src/lunit_harness/api/routes.py",
         "src/lunit_harness/orchestration/driver.py",
@@ -71,14 +72,17 @@ def main() -> int:
     if not any(item.startswith("missing Python dependency") for item in failures):
         passes.append("runtime Python imports")
 
-    tracked = subprocess.run(
-        ["git", "ls-files", "--", "secrets.json", "CODEX_HISTORY_JEHEE.log"],
-        cwd=ROOT,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    if tracked.returncode != 0:
+    try:
+        tracked = subprocess.run(
+            ["git", "ls-files", "--", "secrets.json", "CODEX_HISTORY_JEHEE.log"],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except OSError:
+        tracked = None
+    if tracked is None or tracked.returncode != 0:
         warnings.append("git tracking check unavailable")
     elif tracked.stdout.strip():
         failures.append("local secret/history files are tracked by Git")

@@ -29,7 +29,8 @@ Retrieval과 generation 프롬프트를 분리하고, Mock fixture를 고정 계
 ## 프롬프트 역할
 
 - `generation/grounded_v2.md`: 이미 retrieval 결과를 받은 post-retrieval closed-book 후보입니다. 기존 결과를 보존하며 legacy 비교의 선택 프롬프트입니다.
-- `generation/production_tool_v1.md`: 첫 호출에서 독립형 query로 `retrieve_relevant_content`를 호출하고, tool 결과 이후 숫자 citation으로 최종 답변하는 production 후보입니다.
+- `generation/production_tool_v1.md`: 모든 사용자 질문에 retrieval을 강제했던 보존용 baseline입니다.
+- `generation/production_tool_v2.md`: 일반 의료·비의료 질문은 직접 답하고 특정 근거·정밀 수치·희귀/비전형 사례만 독립형 query로 retrieval하는 production 후보입니다. Tool 결과 이후 숫자 citation과 closed-book 규칙은 유지합니다.
 - `retrieval/grounded_v1.md`: generation에서 해소된 standalone query만 받습니다. 지시어가 남으면 추측하지 않고 `no_evidence`로 종료하며, budget 종료 시 `partial` 또는 `no_evidence`를 반드시 finalize합니다.
 
 ## 전송 모드
@@ -37,7 +38,7 @@ Retrieval과 generation 프롬프트를 분리하고, Mock fixture를 고정 계
 `eval/simulator_runner.py`는 두 grounded transport를 지원합니다.
 
 - `legacy`: fixture JSON과 질문을 한 user message에 결합합니다. 기본 prompt는 `grounded_v2.md`입니다.
-- `tool`: 첫 API 호출에 실제 tool schema를 전달하고 assistant tool call의 standalone query를 기록합니다. fixture 계약을 공식 trajectory 텍스트로 직렬화한 tool-role 결과를 반환한 뒤, assistant tool call과 tool message를 모두 보존한 두 번째 API 호출에서 최종 답변을 생성합니다. 기본 prompt는 `production_tool_v1.md`입니다.
+- `tool`: 첫 API 호출에 실제 tool schema를 전달하고 assistant의 direct answer 또는 standalone retrieval query를 기록합니다. Retrieval을 호출한 경우 fixture 계약을 공식 trajectory 텍스트로 직렬화한 tool-role 결과를 반환한 뒤, assistant tool call과 tool message를 모두 보존한 두 번째 API 호출에서 최종 답변을 생성합니다. 기본 prompt는 `production_tool_v2.md`입니다.
 
 멀티턴 tool 모드는 모든 사용자 turn에서 retrieval을 새로 호출합니다. `그 약`, `그 증상`, `앞의 환자`를 해소한 query, turn별 evidence, 응답 citation과 citation-number-to-`cite_uid` 매핑을 기록합니다.
 
@@ -126,4 +127,17 @@ Root `prompting.py`는 여전히 두 번째 system message, `[출처: cite_uid]`
 4. `no_evidence` deterministic short-circuit 적용.
 5. 최종 응답의 numeric citation과 sentence-level completeness validator 적용.
 
-Root `app.py`, `Dockerfile`, `prompting.py`, `Dev-jehee`는 수정하지 않았습니다.
+위 2026-08-21 handoff 당시에는 root `app.py`, `Dockerfile`, `prompting.py`, `Dev-jehee`를 수정하지 않았습니다.
+
+## 2026-08-22 production_tool_v2 targeted smoke
+
+모든 질문에 retrieval을 강제하던 v1에서 조건부 routing v2로 전환했습니다. 일반 의료 질문은 direct로, 특정 근거·정밀 수치·환자별 임상 결정은 retrieval로 처리하며, tool 직후 citation formatting reminder와 production과 동일한 1회 repair/fallback을 평가 러너에도 적용했습니다.
+
+- 대표 fixture-backed case: 단일 9/9, multi-turn 3/3, 합계 12/12
+- Direct API smoke: 5.72초, 2,305 tokens, degraded 없음, citation 없음
+- Retrieval API smoke: 49.62초, 19,977 tokens, degraded 없음, 숫자 citation 존재
+- Prompt SHA-256: `195B853F274FC3B1C7DADCEFDBEAD31C273680919AC96E350DCDCD4C54882765`
+- Single-turn cases SHA-256: `512FF207367EC9A7FA7B58BEF365846914455438A7187E5B1F875DCD4702FD02`
+- Multi-turn cases SHA-256: `6459746F1185EFCFBFC79DC99A5991EC5A71B7290488A2B28F5D5ACA88292DCA`
+
+이 결과는 동일 prompt/case의 로컬 L2·fixture targeted smoke이며 공식 dashboard 점수가 아닙니다. 복합 MFDS 적응증+금기 live 질의는 한 evidence round에서 적응증만 확보해 금기 범위를 누락했으므로, 관찰상 이득 없이 `no_evidence`를 늘린 다중 evidence round는 production 기본값으로 채택하지 않았습니다.

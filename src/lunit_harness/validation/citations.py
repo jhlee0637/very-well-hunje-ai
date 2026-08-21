@@ -7,9 +7,10 @@ import re
 
 CITATION_PATTERN = re.compile(r"\[(\d+)\]")
 CITATION_AT_END_PATTERN = re.compile(
-    r"(?:\[\d+\](?:\s*,\s*\[\d+\])*)\s*[.!?。！？]?\s*\|?\s*$"
+    r"(?:[.!?。！？]\s*)?(?:\[\d+\](?:\s*,\s*\[\d+\])*)"
+    r"\s*[.!?。！？]?\s*\|?\s*$"
 )
-SENTENCE_SPLIT_PATTERN = re.compile(r"(?<=[.!?。！？])\s+|\n+")
+SENTENCE_SPLIT_PATTERN = re.compile(r"(?<=[.!?。！？])\s+(?!\[\d+\])|\n+")
 LIST_PREFIX_PATTERN = re.compile(r"^(?:[-*•]|\d+[.)])\s*")
 
 
@@ -27,7 +28,8 @@ def split_claim_segments(content: str) -> tuple[str, ...]:
             continue
         if segment.startswith("근거 부족:"):
             continue
-        if not re.search(r"[0-9A-Za-z가-힣]", segment):
+        claim_text = CITATION_PATTERN.sub("", segment)
+        if not re.search(r"[A-Za-z가-힣]", claim_text):
             continue
         claims.append(segment)
     return tuple(claims)

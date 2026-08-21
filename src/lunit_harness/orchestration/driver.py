@@ -69,8 +69,10 @@ class HarnessDriver:
         messages = self.generation.initial_messages(input_messages)
         aggregate_usage: dict[str, int] = {}
         available_citations: set[int] = set()
+        retrieval_was_partial = False
         empty_response_retry_attempted = False
         citation_repair_attempted = False
+        citation_repair_fallback = ""
 
         while True:
             try:
@@ -117,11 +119,20 @@ class HarnessDriver:
                         retained = retain_validly_cited_segments(
                             content, available_citations
                         )
+                        if not retained:
+                            retained = citation_repair_fallback
                         if retained:
                             return self._text_response(
-                                response, retained, aggregate_usage
+                                response,
+                                self._with_partial_notice(
+                                    retained, retrieval_was_partial
+                                ),
+                                aggregate_usage,
                             )
                         return self._no_evidence_response(response, aggregate_usage)
+                    citation_repair_fallback = retain_validly_cited_segments(
+                        content, available_citations
+                    )
                     citation_repair_attempted = True
                     labels = " ".join(
                         f"[{number}]" for number in sorted(available_citations)
@@ -142,6 +153,16 @@ class HarnessDriver:
                     )
                     continue
                 final = dict(response)
+                if retrieval_was_partial:
+                    final_choices = final.get("choices")
+                    if isinstance(final_choices, list) and final_choices:
+                        final_choice = dict(final_choices[0])
+                        final_message = dict(final_choice.get("message") or {})
+                        final_message["content"] = self._with_partial_notice(
+                            content, True
+                        )
+                        final_choice["message"] = final_message
+                        final["choices"] = [final_choice]
                 final["model"] = self.settings.model_name
                 if aggregate_usage:
                     final["usage"] = aggregate_usage
@@ -165,6 +186,9 @@ class HarnessDriver:
                     self._add_usage(aggregate_usage, output.usage)
                     if self._is_no_evidence_tool_content(output.content):
                         return self._no_evidence_response(response, aggregate_usage)
+                    retrieval_was_partial = retrieval_was_partial or (
+                        self._retrieval_status(output.content) == "partial"
+                    )
                     available_citations.update(
                         self._citation_numbers(output.content)
                     )
@@ -173,6 +197,23 @@ class HarnessDriver:
                             "role": "tool",
                             "tool_call_id": call_id,
                             "content": output.content,
+                        }
+                    )
+                    labels = " ".join(
+                        f"[{number}]" for number in sorted(available_citations)
+                    )
+                    messages.append(
+                        {
+                            "role": "user",
+                            "content": (
+                                "Answer the clinical question now using only the tool result. "
+                                "End every medical sentence and every bullet with a directly "
+                                "supporting available numeric citation, repeating the same "
+                                "citation on each supported bullet when needed. Do not add a "
+                                "separate source list or a single citation for a whole list. "
+                                "Available citations: "
+                                + labels
+                            ),
                         }
                     )
                 except BudgetExceededError:
@@ -210,6 +251,22 @@ class HarnessDriver:
             or not isinstance(sources, list)
             or not sources
         )
+
+    @staticmethod
+    def _retrieval_status(content: str) -> str:
+        try:
+            payload = json.loads(content)
+        except (TypeError, json.JSONDecodeError):
+            return ""
+        status = payload.get("status") if isinstance(payload, dict) else None
+        return status if isinstance(status, str) else ""
+
+    @staticmethod
+    def _with_partial_notice(content: str, is_partial: bool) -> str:
+        notice = "근거 부족: 제공된 문서에서 확인할 수 없음"
+        if not is_partial or notice in content:
+            return content
+        return content.rstrip() + "\n" + notice
 
     def _no_evidence_response(
         self, template: dict[str, Any], aggregate_usage: dict[str, int]
