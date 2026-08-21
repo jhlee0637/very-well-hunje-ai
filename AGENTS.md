@@ -134,3 +134,11 @@ eval/simulator_runner.py
 src/lunit_harness/validation/
 '''
 
+## 브랜치 통합 규칙
+
+- Team B 브랜치 root의 `Dockerfile`, `app.py`, `prompting.py`, `tests/test_app.py`는 pure baseline과 prompt 실험 재현용으로 취급하며 production 제출물로 통합하지 않는다.
+- 최종 production `Dockerfile`, root `app.py`, API와 orchestration 구현은 Team A가 소유한다.
+- Team A와 Team B의 개인 브랜치를 통째로 merge하지 않는다. 통합 전 diff를 검토하고 소유 경로만 선택적으로 반영한다.
+- Team B 변경은 `prompts/`, `tests/fixtures/retrieval/`, `eval/cases/`, `eval/simulator_runner.py`, `src/lunit_harness/validation/` 등 Team B 소유 경로만 통합한다.
+- 소유 경로를 벗어나는 변경이 실제 production에 필요하면 양 팀이 목적과 interface를 확인하고 사용자 승인을 받은 뒤 반영한다.
+- `lunit/hackathon-submission` 브랜치는 Docker build, 필수 API, L2/MCP orchestration과 prompt/eval 계약을 함께 검증한 뒤 사용자 승인에 따라 갱신한다.
