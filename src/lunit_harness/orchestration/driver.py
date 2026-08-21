@@ -178,9 +178,10 @@ class HarnessDriver:
                             "content": (
                                 "The retrieval tool is not callable on this turn. Do not print "
                                 "tool names, pseudo-tool markup, XML, or function syntax. Return "
-                                "the final Korean answer now using the conversation and any "
-                                "existing tool result. Preserve numeric citations when evidence "
-                                "is already present. Do not explain this retry."
+                                "the final answer now in the latest user's language using the "
+                                "conversation and any existing tool result. Preserve numeric "
+                                "citations when evidence is already present. Do not explain this "
+                                "retry."
                             ),
                         }
                     )
