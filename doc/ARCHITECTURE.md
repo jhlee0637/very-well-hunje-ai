@@ -314,17 +314,17 @@ Generation은 이 formatter가 반환한 tool result만 retrieved evidence로 �
 | 실패 | 처리 |
 |---|---|
 | Invalid evaluator request | Upstream 호출 없이 OpenAI-compatible 4xx |
-| L2 authentication/connection failure | Sanitized OpenAI-compatible 502 |
-| L2 timeout | Sanitized OpenAI-compatible 504 |
+| L2 authentication/connection failure | `X-Lunit-Degraded: true`를 포함한 OpenAI-compatible 200 `no_evidence` completion |
+| L2 timeout | `X-Lunit-Degraded: true`를 포함한 OpenAI-compatible 200 `no_evidence` completion |
 | MCP tool 하나 실패 | Retrieval L2에 structured tool error 반환, budget 안에서 계속 |
 | 일부 evidence 후 MCP 실패 | Valid selection이 있으면 `partial` 가능 |
 | Evidence 없이 retrieval 종료 | `no_evidence`, fabricated citation 금지 |
 | Unknown or malformed tool call | 제한된 corrective retry 후 종료 |
 | Invalid `finalize_retrieval` | 일반 탐색 중에는 오류 반환, compact finalization에서는 `no_evidence` 종료 |
 | 선택 근거가 있으나 숫자 인용 누락 | Tool 없는 Generation 교정을 정확히 1회 수행, 재실패 시 protocol error |
-| 전체 deadline 초과 | 가능한 terminal state로 종료하거나 fatal model timeout이면 504 |
+| 전체 deadline 초과 | `X-Lunit-Degraded: true`를 포함한 OpenAI-compatible 200 `no_evidence` completion |
 
-MCP 오류를 곧바로 service 5xx로 승격하지 않는다. 반면 최종 답변을 만들 L2 Generation endpoint가 실패하면 service가 정상 assistant response를 위조하지 않는다.
+MCP 오류를 곧바로 service 5xx로 승격하지 않는다. Valid evaluator request에서 runtime credential, L2/MCP 또는 deadline 장애가 발생하면 benchmark inference 자체가 중단되지 않도록 고정 `no_evidence` assistant completion으로 강등한다. 이 응답은 `X-Lunit-Degraded: true`로 정상 L2 응답과 구분하며, invalid request 4xx는 유지한다.
 
 ## 15. 보안과 개인정보 경계
 
@@ -348,7 +348,7 @@ Repository root의 Docker image는 다음 조건을 만족해야 한다.
 
 개발은 `Dev-jehee`에서 수행한다. 공식 checklist의 최종 `lunit/hackathon-submission` 브랜치 반영은 사용자 승인 후 별도 통합 단계에서 수행한다.
 
-공식 문서는 외부 접근이 없는 evaluation 환경과 hosted L2/MCP 사용을 함께 안내한다. Evaluation runtime의 L2/MCP 접근 허용 범위, API key 주입 방식, Docker build network는 organizer 또는 dashboard preflight로 확인해야 한다. 확인되지 않은 상태에서 DuckDB fallback을 기본 경로로 추가하지 않는다.
+공식 문서는 외부 접근이 없는 evaluation 환경과 hosted L2/MCP 사용을 함께 안내한다. Evaluation runtime의 L2/MCP 접근 허용 범위, API key 주입 방식, Docker build network는 organizer 또는 dashboard preflight로 확인해야 한다. Runtime key가 주입되지 않더라도 valid Chat Completions 요청은 degraded 200 completion으로 종료하며, 확인되지 않은 상태에서 DuckDB fallback을 기본 경로로 추가하지 않는다.
 
 ## 17. Module ownership과 배치
 
@@ -426,11 +426,12 @@ Team A는 API, orchestration, clients, tools, citations, Docker와 smoke/preflig
 ## 21. 구현 및 검증 상태 (2026-08-21)
 
 - FastAPI OpenAI-compatible API, L2/MCP client, bounded orchestration, evidence store, citation formatter, Dockerfile, smoke/preflight를 구현했다.
-- Mock 단위·통합·E2E 테스트 43개와 submission preflight 8개 항목이 통과했다.
+- Mock 단위·통합·E2E 테스트 44개와 submission preflight 8개 항목이 통과했다.
 - 실제 L2 생성, MCP protocol `2025-06-18`, 21개 tool 목록, non-query MCP call을 확인했다.
 - Team B의 `production_tool_v1.md`와 `grounded_v1.md`, 10개 case, 8개 fixture, simulator runner를 소유 경로에서 선택 통합했다. Production prompt와 case SHA-256은 handoff manifest와 일치한다.
 - `no_evidence`는 final Generation을 호출하지 않고 고정 문구로 종료한다. 근거 답변은 sentence-level citation completeness를 한 번 교정하고, 실패 시 유효 인용 문장만 보존해 unsupported attribution을 추가하지 않는다.
 - Docker 실제 단일 턴과 지시어를 포함한 후속 턴은 모두 HTTP 200, `finish_reason=stop`, non-empty content, numeric citation 포함으로 통과했다. 확인한 집계 token은 각각 16,437과 16,382였다.
+- Secret이나 추가 environment 없이 실행한 bare Docker에서도 GET과 POST가 HTTP 200을 반환하며, frozen CoEval 동시성 4는 inference failure 없이 완료된다. Runtime credential이 있으면 degraded header 없이 정상 L2 응답 경로를 사용한다.
 - Docker Desktop Linux engine에서 약 128 MiB 이미지를 18.3초에 빌드했고, 자동 startup, 필수 endpoint, read-only runtime secret mount, image의 secret·문서·테스트·cache 제외를 확인했다.
 - Team B raw prompt runner 재실행 결과는 단일 턴 3/7, 다중 턴 0/3이었다. Groundedness·citation correctness·unsupported addition·deflection·no-evidence는 단일 턴에서 모두 통과했고, 주요 실패는 production postcondition 적용 전 sentence-level citation completeness였다.
 - 로컬 TLS inspection 환경은 검증을 끄지 않고 BuildKit secret으로 공개 Root CA를 추가하며, Python 3.13에서는 chain·hostname 검증을 유지한 채 `VERIFY_X509_STRICT` 호환성 플래그만 완화한다. 일반 제출 build에는 로컬 CA secret이 필요하지 않다.

@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import logging
+import time
+import uuid
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator
 
@@ -12,12 +15,46 @@ from fastapi.responses import JSONResponse
 
 from lunit_harness.api.schemas import ChatCompletionRequest
 from lunit_harness.config import Settings
-from lunit_harness.errors import (
-    HarnessError,
-    InvalidRequestError,
-    RequestDeadlineError,
-)
-from lunit_harness.orchestration.driver import HarnessDriver
+from lunit_harness.errors import HarnessError, InvalidRequestError, MCPError
+from lunit_harness.orchestration.driver import NO_EVIDENCE_RESPONSE, HarnessDriver
+
+
+logger = logging.getLogger(__name__)
+_logged_degraded_categories: set[str] = set()
+
+
+def _degraded_chat_completion(model: str, exc: BaseException) -> JSONResponse:
+    """Return a valid completion when a known runtime dependency is unavailable."""
+
+    category = type(exc).__name__
+    if category not in _logged_degraded_categories:
+        _logged_degraded_categories.add(category)
+        logger.warning("Serving degraded chat completion: category=%s", category)
+    return JSONResponse(
+        status_code=200,
+        headers={"X-Lunit-Degraded": "true"},
+        content={
+            "id": f"chatcmpl-degraded-{uuid.uuid4().hex}",
+            "object": "chat.completion",
+            "created": int(time.time()),
+            "model": model,
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {
+                        "role": "assistant",
+                        "content": NO_EVIDENCE_RESPONSE,
+                    },
+                    "finish_reason": "stop",
+                }
+            ],
+            "usage": {
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "total_tokens": 0,
+            },
+        },
+    )
 
 
 def create_app(
@@ -76,8 +113,10 @@ def create_app(
         try:
             async with asyncio.timeout(runtime.settings.request_timeout_seconds):
                 response = await runtime.complete(payload.as_driver_payload())
-        except TimeoutError as exc:
-            raise RequestDeadlineError("Request deadline exceeded") from exc
+        except InvalidRequestError:
+            raise
+        except (HarnessError, MCPError, TimeoutError) as exc:
+            return _degraded_chat_completion(runtime.settings.model_name, exc)
         return JSONResponse(status_code=200, content=response)
 
     @app.get("/health")

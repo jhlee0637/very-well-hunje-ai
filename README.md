@@ -85,12 +85,12 @@ LUNIT_GENERATION_PROMPT_PATH=/app/prompts/generation/production_tool_v1.md
 LUNIT_RETRIEVAL_PROMPT_PATH=/app/prompts/retrieval/grounded_v1.md
 ```
 
-Generation 모델에는 `retrieve_relevant_content`만 보입니다. Retrieval 모델에는 MCP 도구와 로컬 `finalize_retrieval`만 보입니다. `no_evidence` 또는 빈 source는 모델을 다시 호출하지 않고 `제공된 문서에서 확인할 수 없음`으로 종료하며, 근거가 있으면 모든 문장과 bullet 끝의 유효 숫자 인용을 검사하고 한 번만 교정합니다. 교정 후에도 누락된 문장은 삭제하고 유효 인용 문장만 보존하며, 인용을 임의로 추가하지 않습니다.
+Generation 모델에는 `retrieve_relevant_content`만 보입니다. Retrieval 모델에는 MCP 도구와 로컬 `finalize_retrieval`만 보입니다. `no_evidence` 또는 빈 source는 모델을 다시 호출하지 않고 `제공된 문서에서 확인할 수 없음`으로 종료하며, 근거가 있으면 모든 문장과 bullet 끝의 유효 숫자 인용을 검사하고 한 번만 교정합니다. 교정 후에도 누락된 문장은 삭제하고 유효 인용 문장만 보존하며, 인용을 임의로 추가하지 않습니다. 유효한 evaluator 요청 중 runtime credential, L2/MCP 연결 또는 deadline 문제가 발생하면 같은 고정 문구를 OpenAI-compatible HTTP 200 completion으로 반환하고 `X-Lunit-Degraded: true`를 표시합니다. 잘못된 요청은 계속 4xx로 거부합니다.
 
 ## 통합 회귀 결과
 
 - Team B production prompt/case 해시는 handoff manifest와 일치합니다.
-- Production driver 자동 테스트 43개와 preflight 8개 항목이 모두 통과했습니다.
+- Production driver 자동 테스트 44개와 preflight 8개 항목이 모두 통과했습니다.
 - Docker 실제 단일 턴과 지시어를 포함한 후속 턴은 HTTP 200, non-empty content, `finish_reason=stop`, 숫자 인용으로 통과했습니다.
 - Team B raw prompt runner 재실행은 단일 턴 3/7, 다중 턴 0/3이었으며, 주요 실패 축은 sentence-level citation completeness였습니다. 이 raw runner는 production driver의 bounded repair와 deterministic filtering을 적용하지 않은 prompt-only 기준선입니다.
 
