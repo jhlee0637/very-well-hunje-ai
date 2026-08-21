@@ -138,6 +138,7 @@ Generation call에는 Generation 전용 system prompt와 `retrieve_relevant_cont
 - Query는 conversation 없이도 의미가 통하는 standalone 문장이어야 한다.
 - Generation이 최종 content를 반환하면 Retrieval 단계를 실행하지 않는다.
 - Generation이 retrieval을 요청하면 handler가 Retrieval subroutine 전체를 실행한다.
+- 일반·고수준 설명 신호가 있고 근거·정밀 검색 신호가 없으면 conservative code gate가 retrieval tool을 노출하지 않는다.
 - 첫 Retrieval invocation 뒤에는 Generation에서 retrieval tool을 제거해 재검색을 구조적으로 막는다.
 - 선택된 source가 있는데 최종 답변에 유효한 숫자 인용이 없으면 tool 없이 한 번만 교정 생성한다.
 - MVP에서는 한 Generation request의 retrieval invocation에 작은 명시적 상한을 둔다.
@@ -182,12 +183,14 @@ START
 - MCP tool call limit 도달
 - Request deadline 도달
 - 반복 tool call 또는 복구 불가능한 protocol 오류
+- Citable evidence 없이 연속 3회 무진전
+- 누적 직렬화 retrieval input 80,000자 도달
 
 첫 citable evidence가 저장되거나 탐색 budget 경계에 도달하면 누적 tool history를 버리고, 원 질의와 길이가 제한된 evidence catalog 및 `finalize_retrieval` 하나만 포함한 단일 compact finalization call을 실행한다. 이 call이 유효한 selection을 만들지 못해도 Python이 evidence를 임의 선택하지 않는다. 검증된 selection이 없으면 `no_evidence`로 종료하고 내부 note에 원인을 남긴다.
 
 ## 9. MCP tool 실행
 
-MCP client는 Streamable HTTP transport와 Bearer authentication을 캡슐화한다. Tool registry는 server가 실제로 제공한 schema를 기준으로 구성하며, model이 생성한 임의 tool name을 실행하지 않는다.
+MCP client는 Streamable HTTP transport와 Bearer authentication을 캡슐화한다. Tool registry는 server가 실제로 제공한 schema를 기준으로 구성하며, model이 생성한 임의 tool name을 실행하지 않는다. 질의 의도에 맞는 tool family를 선택해 한 model call에 MCP schema 최대 8개만 제공하고 `finalize_retrieval`을 추가한다.
 
 ### 실행 전 검증
 
@@ -298,6 +301,9 @@ Generation은 이 formatter가 반환한 tool result만 retrieved evidence로 �
 | Generation model call limit | Generation 재호출 폭주 방지 |
 | Retrieval invocation limit | 한 답변에서 반복 검색 방지 |
 | Retrieval model turn limit | Retrieval L2 loop 제한 |
+| Retrieval no-progress limit | Citable evidence 없는 반복 탐색 제한 |
+| Retrieval tool schema limit | 매 call에 직렬화하는 MCP schema 제한 |
+| Retrieval input character limit | 누적 prompt/tool-history 재전송 제한 |
 | MCP tool call limit | Tool fan-out 제한 |
 | Duplicate fingerprint limit | 동일 검색 반복 차단 |
 | Model timeout | Upstream L2 지연 제한 |
@@ -306,6 +312,7 @@ Generation은 이 formatter가 반환한 tool result만 retrieved evidence로 �
 | Source token limit | 단일 source 독점 방지 |
 | Augmentation token limit | Generation context 보호 |
 | Selected source limit | Citation 수와 context 크기 제한 |
+| Phase-specific output limit | Generation·retrieval·repair 출력 상한 분리 |
 
 초기 default는 실제 L2/MCP smoke latency와 확인된 model context window를 근거로 정한다. Default가 정해지기 전에도 hard limit 자체를 제거하지 않는다.
 
@@ -314,17 +321,17 @@ Generation은 이 formatter가 반환한 tool result만 retrieved evidence로 �
 | 실패 | 처리 |
 |---|---|
 | Invalid evaluator request | Upstream 호출 없이 OpenAI-compatible 4xx |
-| L2 authentication/connection failure | `X-Lunit-Degraded: true`를 포함한 OpenAI-compatible 200 `no_evidence` completion |
-| L2 timeout | `X-Lunit-Degraded: true`를 포함한 OpenAI-compatible 200 `no_evidence` completion |
-| MCP tool 하나 실패 | Retrieval L2에 structured tool error 반환, budget 안에서 계속 |
-| 일부 evidence 후 MCP 실패 | Valid selection이 있으면 `partial` 가능 |
-| Evidence 없이 retrieval 종료 | `no_evidence`, fabricated citation 금지 |
+| L2 authentication/connection failure | Sanitized OpenAI-compatible 502/503 technical error |
+| L2 timeout | Sanitized OpenAI-compatible 504 technical error |
+| MCP discovery/tool execution 실패 | Sanitized OpenAI-compatible 502 technical error |
+| 일부 evidence 후 MCP 실패 | 검증되지 않은 evidence를 임의 선택하지 않고 technical error |
+| Evidence 없이 정상 retrieval 종료 | `no_evidence` follow-up Generation, fabricated exact fact/citation 금지 |
 | Unknown or malformed tool call | 제한된 corrective retry 후 종료 |
 | Invalid `finalize_retrieval` | 일반 탐색 중에는 오류 반환, compact finalization에서는 `no_evidence` 종료 |
 | 선택 근거가 있으나 숫자 인용 누락 | Tool 없는 Generation 교정을 정확히 1회 수행, 재실패 시 protocol error |
-| 전체 deadline 초과 | `X-Lunit-Degraded: true`를 포함한 OpenAI-compatible 200 `no_evidence` completion |
+| 전체 deadline 초과 | Sanitized OpenAI-compatible 504 technical error |
 
-MCP 오류를 곧바로 service 5xx로 승격하지 않는다. Valid evaluator request에서 runtime credential, L2/MCP 또는 deadline 장애가 발생하면 benchmark inference 자체가 중단되지 않도록 고정 `no_evidence` assistant completion으로 강등한다. 이 응답은 `X-Lunit-Degraded: true`로 정상 L2 응답과 구분하며, invalid request 4xx는 유지한다.
+정상적으로 완료된 검색의 근거 부족과 infrastructure 장애를 분리한다. `no_evidence`는 확인하지 못한 정확한 범위를 밝히면서 안전한 일반 조치·확인 단계·응급 경고를 보존한다. Credential, L2/MCP 연결, protocol 또는 deadline 장애는 임상적 근거 부족으로 위장하지 않고 sanitized technical error로 반환하며, invalid request 4xx도 유지한다.
 
 ## 15. 보안과 개인정보 경계
 
@@ -346,9 +353,9 @@ Repository root의 Docker image는 다음 조건을 만족해야 한다.
 - `GET /v1/models`, `POST /v1/chat/completions` 제공
 - `secrets.json`, 개인 history log, test/eval report, runtime cache 제외
 
-개발은 `Dev-jehee`에서 수행한다. 공식 checklist의 최종 `lunit/hackathon-submission` 브랜치 반영은 사용자 승인 후 별도 통합 단계에서 수행한다.
+팀별 개발 branch에서 작업하고, 공식 checklist의 최종 `lunit/hackathon-submission` 브랜치 반영은 사용자 승인 후 별도 통합 단계에서 수행한다.
 
-공식 문서는 외부 접근이 없는 evaluation 환경과 hosted L2/MCP 사용을 함께 안내한다. Evaluation runtime의 L2/MCP 접근 허용 범위, API key 주입 방식, Docker build network는 organizer 또는 dashboard preflight로 확인해야 한다. Runtime key가 주입되지 않더라도 valid Chat Completions 요청은 degraded 200 completion으로 종료하며, 확인되지 않은 상태에서 DuckDB fallback을 기본 경로로 추가하지 않는다.
+공식 문서는 외부 접근이 없는 evaluation 환경과 hosted L2/MCP 사용을 함께 안내한다. Evaluation runtime의 L2/MCP 접근 허용 범위, API key 주입 방식, Docker build network는 organizer 또는 dashboard preflight로 확인해야 한다. Runtime credential이 없으면 preflight와 sanitized configuration error로 명확히 실패시키며, 확인되지 않은 상태에서 DuckDB fallback을 기본 경로로 추가하지 않는다.
 
 ## 17. Module ownership과 배치
 
@@ -429,9 +436,9 @@ Team A는 API, orchestration, clients, tools, citations, Docker와 smoke/preflig
 - Mock 단위·통합·E2E 테스트 44개와 submission preflight 8개 항목이 통과했다.
 - 실제 L2 생성, MCP protocol `2025-06-18`, 21개 tool 목록, non-query MCP call을 확인했다.
 - Team B의 `production_tool_v1.md`와 `grounded_v1.md`, 10개 case, 8개 fixture, simulator runner를 소유 경로에서 선택 통합했다. Production prompt와 case SHA-256은 handoff manifest와 일치한다.
-- `no_evidence`는 final Generation을 호출하지 않고 고정 문구로 종료한다. 근거 답변은 sentence-level citation completeness를 한 번 교정하고, 실패 시 유효 인용 문장만 보존해 unsupported attribution을 추가하지 않는다.
+- `no_evidence`는 final Generation에서 확인하지 못한 범위를 밝히고 안전한 일반 조치·확인 단계·응급 경고를 보존한다. 근거 답변은 sentence-level citation completeness를 한 번 교정하고, 실패 시 유효 인용 문장만 보존해 unsupported attribution을 추가하지 않는다.
 - Docker 실제 단일 턴과 지시어를 포함한 후속 턴은 모두 HTTP 200, `finish_reason=stop`, non-empty content, numeric citation 포함으로 통과했다. 확인한 집계 token은 각각 16,437과 16,382였다.
-- Secret이나 추가 environment 없이 실행한 bare Docker에서도 GET과 POST가 HTTP 200을 반환하며, frozen CoEval 동시성 4는 inference failure 없이 완료된다. Runtime credential이 있으면 degraded header 없이 정상 L2 응답 경로를 사용한다.
+- Runtime credential은 Docker image에 포함하지 않고 실행 환경에서 주입한다. 누락 시 임상 응답으로 위장하지 않는 configuration error를 반환한다.
 - Docker Desktop Linux engine에서 약 128 MiB 이미지를 18.3초에 빌드했고, 자동 startup, 필수 endpoint, read-only runtime secret mount, image의 secret·문서·테스트·cache 제외를 확인했다.
 - Team B raw prompt runner 재실행 결과는 단일 턴 3/7, 다중 턴 0/3이었다. Groundedness·citation correctness·unsupported addition·deflection·no-evidence는 단일 턴에서 모두 통과했고, 주요 실패는 production postcondition 적용 전 sentence-level citation completeness였다.
 - 로컬 TLS inspection 환경은 검증을 끄지 않고 BuildKit secret으로 공개 Root CA를 추가하며, Python 3.13에서는 chain·hostname 검증을 유지한 채 `VERIFY_X509_STRICT` 호환성 플래그만 완화한다. 일반 제출 build에는 로컬 CA secret이 필요하지 않다.

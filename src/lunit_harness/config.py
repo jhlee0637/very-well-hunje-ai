@@ -57,12 +57,17 @@ class Settings:
     retrieval_invocation_limit: int
     retrieval_turn_limit: int
     retrieval_evidence_round_limit: int
+    retrieval_no_progress_limit: int
+    retrieval_tool_limit: int
+    retrieval_input_char_limit: int
     mcp_tool_call_limit: int
     duplicate_tool_call_limit: int
     selected_source_limit: int
     source_token_limit: int
     augmentation_token_limit: int
     model_max_tokens: int
+    retrieval_model_max_tokens: int
+    repair_model_max_tokens: int
     mcp_result_char_limit: int
     generation_prompt_path: str | None
     retrieval_prompt_path: str | None
@@ -90,22 +95,35 @@ class Settings:
             retrieval_invocation_limit=_positive_int(
                 "LUNIT_RETRIEVAL_INVOCATION_LIMIT", 1
             ),
-            retrieval_turn_limit=_positive_int("LUNIT_RETRIEVAL_TURN_LIMIT", 8),
+            retrieval_turn_limit=_positive_int("LUNIT_RETRIEVAL_TURN_LIMIT", 4),
             retrieval_evidence_round_limit=_positive_int(
                 "LUNIT_RETRIEVAL_EVIDENCE_ROUND_LIMIT", 1
             ),
-            mcp_tool_call_limit=_positive_int("LUNIT_MCP_TOOL_CALL_LIMIT", 8),
+            retrieval_no_progress_limit=_positive_int(
+                "LUNIT_RETRIEVAL_NO_PROGRESS_LIMIT", 3
+            ),
+            retrieval_tool_limit=_positive_int("LUNIT_RETRIEVAL_TOOL_LIMIT", 8),
+            retrieval_input_char_limit=_positive_int(
+                "LUNIT_RETRIEVAL_INPUT_CHAR_LIMIT", 80000
+            ),
+            mcp_tool_call_limit=_positive_int("LUNIT_MCP_TOOL_CALL_LIMIT", 4),
             duplicate_tool_call_limit=_positive_int(
                 "LUNIT_DUPLICATE_TOOL_CALL_LIMIT", 1
             ),
-            selected_source_limit=_positive_int("LUNIT_SELECTED_SOURCE_LIMIT", 6),
-            source_token_limit=_positive_int("LUNIT_SOURCE_TOKEN_LIMIT", 1200),
+            selected_source_limit=_positive_int("LUNIT_SELECTED_SOURCE_LIMIT", 4),
+            source_token_limit=_positive_int("LUNIT_SOURCE_TOKEN_LIMIT", 800),
             augmentation_token_limit=_positive_int(
-                "LUNIT_AUGMENTATION_TOKEN_LIMIT", 6000
+                "LUNIT_AUGMENTATION_TOKEN_LIMIT", 3000
             ),
             model_max_tokens=_positive_int("LUNIT_MODEL_MAX_TOKENS", 2048),
+            retrieval_model_max_tokens=_positive_int(
+                "LUNIT_RETRIEVAL_MODEL_MAX_TOKENS", 512
+            ),
+            repair_model_max_tokens=_positive_int(
+                "LUNIT_REPAIR_MODEL_MAX_TOKENS", 768
+            ),
             mcp_result_char_limit=_positive_int(
-                "LUNIT_MCP_RESULT_CHAR_LIMIT", 12000
+                "LUNIT_MCP_RESULT_CHAR_LIMIT", 6000
             ),
             generation_prompt_path=os.getenv("LUNIT_GENERATION_PROMPT_PATH") or None,
             retrieval_prompt_path=os.getenv("LUNIT_RETRIEVAL_PROMPT_PATH") or None,

@@ -31,6 +31,7 @@ Retrieval과 generation 프롬프트를 분리하고, Mock fixture를 고정 계
 - `generation/grounded_v2.md`: 이미 retrieval 결과를 받은 post-retrieval closed-book 후보입니다. 기존 결과를 보존하며 legacy 비교의 선택 프롬프트입니다.
 - `generation/production_tool_v1.md`: 모든 사용자 질문에 retrieval을 강제했던 보존용 baseline입니다.
 - `generation/production_tool_v2.md`: 일반 의료·비의료 질문은 직접 답하고 특정 근거·정밀 수치·희귀/비전형 사례만 독립형 query로 retrieval하는 production 후보입니다. Tool 결과 이후 숫자 citation과 closed-book 규칙은 유지합니다.
+- `generation/production_tool_v3.md`: v2의 조건부 routing을 간결화하고, 직접 답변을 기본값으로 명시한 token-budget 기준 후보입니다. 명백한 일반·고수준 요청은 코드 게이트에서도 tool을 숨깁니다.
 - `generation/production_tool_v4.md`: HealthBench 품질 정합 후보입니다. 환자·보호자·임상의를 동적으로 구분하고 사용자 언어를 따르며, 임상적 정확성·완전성·맥락·소통을 token 최소화나 citation 형식보다 우선합니다. 검색 실패 시에도 검증되지 않은 정밀 사실은 만들지 않으면서 고신뢰 안전 조치와 필요한 확인 정보를 보존합니다.
 - `retrieval/grounded_v1.md`: generation에서 해소된 standalone query만 받습니다. 지시어가 남으면 추측하지 않고 `no_evidence`로 종료하며, budget 종료 시 `partial` 또는 `no_evidence`를 반드시 finalize합니다.
 
@@ -47,7 +48,7 @@ Retrieval과 generation 프롬프트를 분리하고, Mock fixture를 고정 계
 
 - Model: `Lunit/L2-preview`
 - Temperature: `0.0`
-- Max tokens: `2048`
+- Max tokens: `2048` (retrieval `512`, citation repair `768`)
 - 주요 축: groundedness, citation correctness/completeness, unsupported addition, contradiction, deflection, no-evidence, standalone query, multi-turn citation stability.
 - Citation completeness는 각 주요 의학 주장 또는 수치 문장 끝의 citation을 검사합니다. 목록 소개 문장 하나의 citation은 아래 bullet을 대신하지 않습니다.
 - Citation correctness는 번호가 실제 source에 존재하고, 금지 source가 아니며, 해당 문장의 구성 용어가 case의 source-support 용어와 연결되는지 검사합니다.
@@ -84,7 +85,7 @@ python eval/simulator_runner.py --mode baseline --multiturn `
   --cases eval/cases/quality_multiturn.jsonl
 ```
 
-`production_tool_v4.md`의 helpful no-evidence와 non-destructive citation 정책을 production에 적용하려면 Team A의 current orchestration interface 확인이 필요합니다. Team A 작업이 main에 반영되기 전에는 Team A 소유 경로를 수정하지 않습니다.
+Team A의 `c617ea7` orchestration과 통합해 helpful no-evidence, bounded retrieval, compact citation repair, dynamic persona/language 계약을 production 경로에 연결합니다. Citation validator의 deterministic safety 경계는 유지하고 별도 회귀로 비파괴 정책을 검증합니다.
 
 ### 2026-08-22 quality A/B 결과
 
@@ -121,7 +122,7 @@ L2는 `no_evidence` tool result를 받은 뒤에도 파라미터 지식으로 �
 - `response`와 `score`: production postcondition 적용 후 결과.
 - `normalization`: 적용한 guard 목록.
 
-현재 유일한 정규화는 빈 sources 또는 `no_evidence`를 정확히 `제공된 문서에서 확인할 수 없음`으로 바꾸는 `no_evidence_closed_book_guard`입니다. 다른 hallucination이나 citation 오류는 수정하지 않고 실패로 남깁니다. Team A production orchestration에도 같은 deterministic short-circuit가 필요합니다.
+이 2026-08-21 평가 당시 유일한 정규화는 빈 sources 또는 `no_evidence`를 정확히 `제공된 문서에서 확인할 수 없음`으로 바꾸는 `no_evidence_closed_book_guard`였습니다. 이후 production 통합에서는 한 줄 고정 응답 대신 확인 불가 범위·안전 원칙·검증 단계가 있는 helpful no-evidence 응답과 unsupported exact fact guard를 사용합니다.
 
 ### 남은 실패 사례
 
@@ -165,9 +166,9 @@ docker run --rm -v "${PWD}:/work" -w /work python:3.13-slim `
   --rescore-results results/<existing-result>.jsonl
 ```
 
-## Team A handoff
+## Team A handoff (2026-08-21 당시 기록)
 
-Root `prompting.py`는 여전히 두 번째 system message, `[출처: cite_uid]`, status 자동 보정 등 구 계약을 사용합니다. Team B 소유 경로가 아니므로 이번 변경에서는 수정하지 않았고 deprecated integration path로 표시합니다. Team A는 production orchestration을 연결할 때 다음을 교체해야 합니다.
+당시 root `prompting.py`는 두 번째 system message, `[출처: cite_uid]`, status 자동 보정 등 구 계약을 사용했습니다. 이후 Team A `c617ea7` 통합에서 이 deprecated 경로는 제거되고 production orchestration으로 교체되었습니다. 아래 목록은 당시의 handoff 요구사항입니다.
 
 1. Generation에 `production_tool_v1.md`와 `retrieve_relevant_content` tool 하나를 제공.
 2. 실제 assistant tool call과 tool-role result를 대화 기록에 보존.
@@ -189,3 +190,42 @@ Root `prompting.py`는 여전히 두 번째 system message, `[출처: cite_uid]`
 - Multi-turn cases SHA-256: `6459746F1185EFCFBFC79DC99A5991EC5A71B7290488A2B28F5D5ACA88292DCA`
 
 이 결과는 동일 prompt/case의 로컬 L2·fixture targeted smoke이며 공식 dashboard 점수가 아닙니다. 복합 MFDS 적응증+금기 live 질의는 한 evidence round에서 적응증만 확보해 금기 범위를 누락했으므로, 관찰상 이득 없이 `no_evidence`를 늘린 다중 evidence round는 production 기본값으로 채택하지 않았습니다.
+
+## 2026-08-22 production_tool_v3 token-budget holdout
+
+Trial 4의 4.05점과 17.5M tokens(input 16.7M / output 860.4K)를 기준으로, 모든 turn retrieval·전체 MCP schema 재전송·raw tool history 누적을 분리해 수정했습니다. Holdout은 prompt에 포함되지 않은 20개 질문으로 direct/retrieval을 10개씩 균형 구성했으며, 불완전한 지시어 대신 실제 검색 가능한 개체를 포함합니다.
+
+| 지표 | 결과 |
+|---|---:|
+| 전체 / routing | 20/20 / 20/20 |
+| Groundedness / citation correctness / completeness | 100% / 100% / 100% |
+| Unsupported addition / contradiction / deflection | 100% / 100% / 0% deflection rate |
+| no-evidence | 100% |
+| 총 token | 35,390 (input 28,240 / output 7,150) |
+| Direct / retrieval 평균 token | 1,972.9 / 1,566.1 |
+| 평균 latency | 4.905초 |
+
+- Prompt SHA-256: `3FB4E18385ADCA092BEDB0C88D3294988F1E4087BECDA11ED3F217DED51724C3`
+- Holdout cases SHA-256: `B5E6BD17DBF9CF7380B98E109ED464BEE92B5280DD4DFD58FAF8FE1C0D88107D`
+- Result SHA-256: `3642FDE2A157A77D5142D842AF2955BDAAA855E4908A37BBF08210B2387383C1`
+- 최종 Docker direct smoke: 2,212 tokens, 12.11초, `finish_reason=stop`.
+- 실제 MFDS retrieval smoke: 8,234 tokens, 24.18초, 숫자 citation 존재. v2의 19,977 tokens보다 58.8% 적습니다.
+
+구조적 제한은 query별 MCP schema 최대 8개, retrieval input 80,000자, retrieval model turn/MCP call 각각 4회, no-progress 3회, tool result 6,000자, 선택 source 4개, augmentation 3,000 token입니다. 이 holdout은 회귀 검증용이며 공식 dashboard 점수를 대체하지 않습니다.
+
+## 2026-08-22 Team A main + production_tool_v4 통합 회귀
+
+`c617ea7`을 병합한 첫 v4 실행은 14/20(70%)이었습니다. `no_evidence` 뒤에 모델 파라미터 지식으로 소아 용량, 고혈압 목표 수치, 치료 단계 등을 추가한 실제 실패를 바탕으로 숫자 citation·새 정밀 수치·즉시 투약 중단·과도한 길이를 검사하고, 보정이 비거나 다시 위반하면 안전한 helpful fallback을 반환하도록 production과 evaluator를 일치시켰습니다.
+
+| 검증 | 결과 |
+|---|---:|
+| 자동 테스트 | app 71/71 + eval 6/6 = 77/77 |
+| 전체 v4 route holdout | 18/20 (90%), 완료 20/20, 오류 0 |
+| Citation correctness / completeness | 100% / 100% |
+| Unsupported addition / contradiction / deflection | 100% / 100% / 0% deflection rate |
+| Groundedness / no-evidence / route | 95% / 95% / 95% |
+| 총 token | 99,556 (input 77,949 / output 21,607) |
+| 평균 latency / 응답 문자 | 17.034초 / 483.3자 |
+| 남은 두 축 targeted 재검증 | 2/2 통과 |
+
+마지막 두 실패는 특정 정답을 prompt에 추가하지 않고, 일반적인 간결 설명 표현을 direct signal로 확장하고 no-evidence 고지의 완결성을 검사하는 방식으로 수정했습니다. 이 결과는 공식 dashboard 점수가 아니며, 안전 보정으로 늘어난 호출 비용은 공식 token 사용량과 함께 관찰합니다.
