@@ -1,0 +1,626 @@
+{
+  "schema_version": 1,
+  "source": {
+    "model_id": "learning-unit/L1-16B-A3B",
+    "url": "https://huggingface.co/learning-unit/L1-16B-A3B",
+    "revision": "d9d6f7a89aa6bc17369369072151bb4d130a8b7c",
+    "captured_at": "2026-08-21T07:33:02.811924+00:00",
+    "license": "apache-2.0"
+  },
+  "purpose": {
+    "task": "text-generation",
+    "domain": [
+      "medical",
+      "clinical"
+    ],
+    "description": "Medical-domain causal language model for clinical reasoning and decision support."
+  },
+  "architecture": {
+    "name": "GravityMoEForCausalLM",
+    "model_type": "gravity_moe",
+    "base_model": "trillionlabs/Gravity-16B-A3B-Base",
+    "total_parameters_billions": 16.24,
+    "active_parameters_billions": 3.0,
+    "num_hidden_layers": 28,
+    "hidden_size": 2048,
+    "intermediate_size": 8192,
+    "moe_intermediate_size": 1408,
+    "num_attention_heads": 16,
+    "num_key_value_heads": 16,
+    "routed_experts": 64,
+    "shared_experts": 1,
+    "experts_per_token": 8,
+    "context_length": 32768,
+    "vocabulary_size": 151552,
+    "precision": "bfloat16"
+  },
+  "config": {
+    "architectures": [
+      "GravityMoEForCausalLM"
+    ],
+    "model_type": "gravity_moe",
+    "auto_map": {
+      "AutoConfig": "configuration_gravity_moe.GravityMoEConfig",
+      "AutoModelForCausalLM": "modeling_gravity_moe.GravityMoEForCausalLM"
+    },
+    "vocab_size": 151552,
+    "hidden_size": 2048,
+    "intermediate_size": 8192,
+    "moe_intermediate_size": 1408,
+    "num_hidden_layers": 28,
+    "num_attention_heads": 16,
+    "num_key_value_heads": 16,
+    "q_lora_rank": null,
+    "kv_lora_rank": 512,
+    "qk_rope_head_dim": 64,
+    "qk_nope_head_dim": 128,
+    "v_head_dim": 128,
+    "n_routed_experts": 64,
+    "n_shared_experts": 1,
+    "num_experts_per_tok": 8,
+    "first_k_dense_replace": 1,
+    "moe_layer_freq": 1,
+    "routed_scaling_factor": 2.446,
+    "norm_topk_prob": true,
+    "scoring_func": "sigmoid",
+    "topk_method": "noaux_tc",
+    "n_group": 1,
+    "topk_group": 1,
+    "hidden_act": "silu",
+    "max_position_embeddings": 32768,
+    "initializer_range": 0.02,
+    "rms_norm_eps": 1e-06,
+    "use_cache": true,
+    "rope_theta": 1000000.0,
+    "rope_scaling": null,
+    "attention_bias": false,
+    "attention_dropout": 0.0,
+    "tie_word_embeddings": false,
+    "bos_token_id": null,
+    "eos_token_id": 151329,
+    "torch_dtype": "bfloat16",
+    "pad_token_id": 151329
+  },
+  "reported_benchmarks": {
+    "decoding": "greedy (temperature=0)",
+    "mcqa_weighted_average": 77.74,
+    "healthbench_consensus": 93.5,
+    "independently_reproduced": false
+  },
+  "upstream_files": [
+    {
+      "path": ".gitattributes",
+      "size_bytes": null,
+      "blob_id": null,
+      "lfs": null,
+      "mirrored": false
+    },
+    {
+      "path": "LICENSE",
+      "size_bytes": null,
+      "blob_id": null,
+      "lfs": null,
+      "mirrored": false
+    },
+    {
+      "path": "README.md",
+      "size_bytes": null,
+      "blob_id": null,
+      "lfs": null,
+      "mirrored": false
+    },
+    {
+      "path": "banner.png",
+      "size_bytes": null,
+      "blob_id": null,
+      "lfs": null,
+      "mirrored": false
+    },
+    {
+      "path": "chat_template.jinja",
+      "size_bytes": null,
+      "blob_id": null,
+      "lfs": null,
+      "mirrored": false
+    },
+    {
+      "path": "config.json",
+      "size_bytes": null,
+      "blob_id": null,
+      "lfs": null,
+      "mirrored": false
+    },
+    {
+      "path": "configuration_gravity_moe.py",
+      "size_bytes": null,
+      "blob_id": null,
+      "lfs": null,
+      "mirrored": false
+    },
+    {
+      "path": "consortium.png",
+      "size_bytes": null,
+      "blob_id": null,
+      "lfs": null,
+      "mirrored": false
+    },
+    {
+      "path": "generation_config.json",
+      "size_bytes": null,
+      "blob_id": null,
+      "lfs": null,
+      "mirrored": false
+    },
+    {
+      "path": "model.safetensors",
+      "size_bytes": null,
+      "blob_id": null,
+      "lfs": null,
+      "mirrored": false
+    },
+    {
+      "path": "modeling_gravity_moe.py",
+      "size_bytes": null,
+      "blob_id": null,
+      "lfs": null,
+      "mirrored": false
+    },
+    {
+      "path": "special_tokens_map.json",
+      "size_bytes": null,
+      "blob_id": null,
+      "lfs": null,
+      "mirrored": false
+    },
+    {
+      "path": "tokenizer.json",
+      "size_bytes": null,
+      "blob_id": null,
+      "lfs": null,
+      "mirrored": false
+    },
+    {
+      "path": "tokenizer_config.json",
+      "size_bytes": null,
+      "blob_id": null,
+      "lfs": null,
+      "mirrored": false
+    }
+  ],
+  "limitations": [
+    "Not a substitute for professional medical judgment.",
+    "May produce incorrect, incomplete, or outdated clinical information.",
+    "Thinking tokens increase token usage and latency.",
+    "No real-time knowledge.",
+    "Maximum context length is 32768 tokens."
+  ],
+  "integration_notes": {
+    "requires_trust_remote_code": true,
+    "recommended_max_output_tokens": 2048,
+    "recommended_server": "SGLang",
+    "weights_mirrored_to_github": false,
+    "offline_evaluation_warning": "Do not download this model at evaluation runtime; the hackathon evaluation environment has no external network access."
+  },
+  "inspected_files": {
+    "config.json": {
+      "path": "config.json",
+      "size_bytes": 1318,
+      "sha256": "7cdc425eca35ff0b4646ab6d823ebc2a9e119021b3d2a1c91a8fd96806e2f5e9",
+      "etag": "\"6d372398df8228beb68240f458cd400ced83263b\"",
+      "content": {
+        "architectures": [
+          "GravityMoEForCausalLM"
+        ],
+        "model_type": "gravity_moe",
+        "auto_map": {
+          "AutoConfig": "configuration_gravity_moe.GravityMoEConfig",
+          "AutoModelForCausalLM": "modeling_gravity_moe.GravityMoEForCausalLM"
+        },
+        "vocab_size": 151552,
+        "hidden_size": 2048,
+        "intermediate_size": 8192,
+        "moe_intermediate_size": 1408,
+        "num_hidden_layers": 28,
+        "num_attention_heads": 16,
+        "num_key_value_heads": 16,
+        "q_lora_rank": null,
+        "kv_lora_rank": 512,
+        "qk_rope_head_dim": 64,
+        "qk_nope_head_dim": 128,
+        "v_head_dim": 128,
+        "n_routed_experts": 64,
+        "n_shared_experts": 1,
+        "num_experts_per_tok": 8,
+        "first_k_dense_replace": 1,
+        "moe_layer_freq": 1,
+        "routed_scaling_factor": 2.446,
+        "norm_topk_prob": true,
+        "scoring_func": "sigmoid",
+        "topk_method": "noaux_tc",
+        "n_group": 1,
+        "topk_group": 1,
+        "hidden_act": "silu",
+        "max_position_embeddings": 32768,
+        "initializer_range": 0.02,
+        "rms_norm_eps": 1e-06,
+        "use_cache": true,
+        "rope_theta": 1000000.0,
+        "rope_scaling": null,
+        "attention_bias": false,
+        "attention_dropout": 0.0,
+        "tie_word_embeddings": false,
+        "bos_token_id": null,
+        "eos_token_id": 151329,
+        "torch_dtype": "bfloat16",
+        "pad_token_id": 151329
+      }
+    },
+    "generation_config.json": {
+      "path": "generation_config.json",
+      "size_bytes": 166,
+      "sha256": "3c505d32b3b32f9383b1f49cb95d63e279230c178f6e86c3d36d88b62cd2b9c3",
+      "etag": "\"9f820c32d0880705696b079b0a792eba484c97ec\"",
+      "content": {
+        "_from_model_config": true,
+        "eos_token_id": [
+          151329,
+          151329,
+          151336,
+          151338
+        ],
+        "pad_token_id": 151329,
+        "transformers_version": "5.3.0"
+      }
+    },
+    "tokenizer_config.json": {
+      "path": "tokenizer_config.json",
+      "size_bytes": 7311,
+      "sha256": "14a3484d689dae8f6bf58c250617bfa95bd0c7404480cf3f3feb364f1f0394eb",
+      "etag": "\"75e11cfb2e0cc09f19391ec2278b4825a4c3fae9\"",
+      "content": {
+        "added_tokens_decoder": {
+          "151329": {
+            "content": "<|endoftext|>",
+            "lstrip": false,
+            "normalized": false,
+            "rstrip": false,
+            "single_word": false,
+            "special": true
+          },
+          "151330": {
+            "content": "[MASK]",
+            "lstrip": false,
+            "normalized": false,
+            "rstrip": false,
+            "single_word": false,
+            "special": true
+          },
+          "151331": {
+            "content": "[gMASK]",
+            "lstrip": false,
+            "normalized": false,
+            "rstrip": false,
+            "single_word": false,
+            "special": true
+          },
+          "151332": {
+            "content": "[sMASK]",
+            "lstrip": false,
+            "normalized": false,
+            "rstrip": false,
+            "single_word": false,
+            "special": true
+          },
+          "151333": {
+            "content": "<sop>",
+            "lstrip": false,
+            "normalized": false,
+            "rstrip": false,
+            "single_word": false,
+            "special": true
+          },
+          "151334": {
+            "content": "<eop>",
+            "lstrip": false,
+            "normalized": false,
+            "rstrip": false,
+            "single_word": false,
+            "special": true
+          },
+          "151335": {
+            "content": "<|system|>",
+            "lstrip": false,
+            "normalized": false,
+            "rstrip": false,
+            "single_word": false,
+            "special": true
+          },
+          "151336": {
+            "content": "<|user|>",
+            "lstrip": false,
+            "normalized": false,
+            "rstrip": false,
+            "single_word": false,
+            "special": true
+          },
+          "151337": {
+            "content": "<|assistant|>",
+            "lstrip": false,
+            "normalized": false,
+            "rstrip": false,
+            "single_word": false,
+            "special": true
+          },
+          "151338": {
+            "content": "<|observation|>",
+            "lstrip": false,
+            "normalized": false,
+            "rstrip": false,
+            "single_word": false,
+            "special": true
+          },
+          "151339": {
+            "content": "<|begin_of_image|>",
+            "lstrip": false,
+            "normalized": false,
+            "rstrip": false,
+            "single_word": false,
+            "special": true
+          },
+          "151340": {
+            "content": "<|end_of_image|>",
+            "lstrip": false,
+            "normalized": false,
+            "rstrip": false,
+            "single_word": false,
+            "special": true
+          },
+          "151341": {
+            "content": "<|begin_of_video|>",
+            "lstrip": false,
+            "normalized": false,
+            "rstrip": false,
+            "single_word": false,
+            "special": true
+          },
+          "151342": {
+            "content": "<|end_of_video|>",
+            "lstrip": false,
+            "normalized": false,
+            "rstrip": false,
+            "single_word": false,
+            "special": true
+          },
+          "151343": {
+            "content": "<|begin_of_audio|>",
+            "lstrip": false,
+            "normalized": false,
+            "rstrip": false,
+            "single_word": false,
+            "special": true
+          },
+          "151344": {
+            "content": "<|end_of_audio|>",
+            "lstrip": false,
+            "normalized": false,
+            "rstrip": false,
+            "single_word": false,
+            "special": true
+          },
+          "151345": {
+            "content": "<|begin_of_transcription|>",
+            "lstrip": false,
+            "normalized": false,
+            "rstrip": false,
+            "single_word": false,
+            "special": true
+          },
+          "151346": {
+            "content": "<|end_of_transcription|>",
+            "lstrip": false,
+            "normalized": false,
+            "rstrip": false,
+            "single_word": false,
+            "special": true
+          },
+          "151347": {
+            "content": "<|code_prefix|>",
+            "lstrip": false,
+            "normalized": false,
+            "rstrip": false,
+            "single_word": false,
+            "special": true
+          },
+          "151348": {
+            "content": "<|code_middle|>",
+            "lstrip": false,
+            "normalized": false,
+            "rstrip": false,
+            "single_word": false,
+            "special": true
+          },
+          "151349": {
+            "content": "<|code_suffix|>",
+            "lstrip": false,
+            "normalized": false,
+            "rstrip": false,
+            "single_word": false,
+            "special": true
+          },
+          "151350": {
+            "content": "<think>",
+            "lstrip": false,
+            "normalized": false,
+            "rstrip": false,
+            "single_word": false,
+            "special": false
+          },
+          "151351": {
+            "content": "</think>",
+            "lstrip": false,
+            "normalized": false,
+            "rstrip": false,
+            "single_word": false,
+            "special": false
+          },
+          "151352": {
+            "content": "<tool_call>",
+            "lstrip": false,
+            "normalized": false,
+            "rstrip": false,
+            "single_word": false,
+            "special": false
+          },
+          "151353": {
+            "content": "</tool_call>",
+            "lstrip": false,
+            "normalized": false,
+            "rstrip": false,
+            "single_word": false,
+            "special": false
+          },
+          "151354": {
+            "content": "<tool_response>",
+            "lstrip": false,
+            "normalized": false,
+            "rstrip": false,
+            "single_word": false,
+            "special": false
+          },
+          "151355": {
+            "content": "</tool_response>",
+            "lstrip": false,
+            "normalized": false,
+            "rstrip": false,
+            "single_word": false,
+            "special": false
+          },
+          "151356": {
+            "content": "<arg_key>",
+            "lstrip": false,
+            "normalized": false,
+            "rstrip": false,
+            "single_word": false,
+            "special": false
+          },
+          "151357": {
+            "content": "</arg_key>",
+            "lstrip": false,
+            "normalized": false,
+            "rstrip": false,
+            "single_word": false,
+            "special": false
+          },
+          "151358": {
+            "content": "<arg_value>",
+            "lstrip": false,
+            "normalized": false,
+            "rstrip": false,
+            "single_word": false,
+            "special": false
+          },
+          "151359": {
+            "content": "</arg_value>",
+            "lstrip": false,
+            "normalized": false,
+            "rstrip": false,
+            "single_word": false,
+            "special": false
+          },
+          "151360": {
+            "content": "/nothink",
+            "lstrip": false,
+            "normalized": false,
+            "rstrip": false,
+            "single_word": false,
+            "special": true
+          },
+          "151361": {
+            "content": "<|begin_of_box|>",
+            "lstrip": false,
+            "normalized": false,
+            "rstrip": false,
+            "single_word": false,
+            "special": false
+          },
+          "151362": {
+            "content": "<|end_of_box|>",
+            "lstrip": false,
+            "normalized": false,
+            "rstrip": false,
+            "single_word": false,
+            "special": false
+          },
+          "151363": {
+            "content": "<|image|>",
+            "lstrip": false,
+            "normalized": false,
+            "rstrip": false,
+            "single_word": false,
+            "special": false
+          },
+          "151364": {
+            "content": "<|video|>",
+            "lstrip": false,
+            "normalized": false,
+            "rstrip": false,
+            "single_word": false,
+            "special": false
+          }
+        },
+        "additional_special_tokens": [
+          "<|endoftext|>",
+          "[MASK]",
+          "[gMASK]",
+          "[sMASK]",
+          "<sop>",
+          "<eop>",
+          "<|system|>",
+          "<|user|>",
+          "<|assistant|>",
+          "<|observation|>",
+          "<|begin_of_image|>",
+          "<|end_of_image|>",
+          "<|begin_of_video|>",
+          "<|end_of_video|>",
+          "<|begin_of_audio|>",
+          "<|end_of_audio|>",
+          "<|begin_of_transcription|>",
+          "<|end_of_transcription|>",
+          "<|code_prefix|>",
+          "<|code_middle|>",
+          "<|code_suffix|>",
+          "/nothink"
+        ],
+        "clean_up_tokenization_spaces": false,
+        "do_lower_case": false,
+        "eos_token": "<|endoftext|>",
+        "extra_special_tokens": {},
+        "model_max_length": 128000,
+        "pad_token": "<|endoftext|>",
+        "padding_side": "left",
+        "remove_space": false,
+        "tokenizer_class": "PreTrainedTokenizerFast"
+      }
+    },
+    "chat_template.jinja": {
+      "path": "chat_template.jinja",
+      "size_bytes": 3205,
+      "sha256": "1a7f0408e7a7fc2538da6250b8cc3e7cb8b2c5c04132d647e9022c891684ce09",
+      "etag": "\"1f67b0d974e4ea7fdb6835de3e943bee27d61730\""
+    },
+    "configuration_gravity_moe.py": {
+      "path": "configuration_gravity_moe.py",
+      "size_bytes": 4020,
+      "sha256": "7441dd4d25643a6823ab1a43c0e32bf17f13fd6caa156587c3a49a0673157740",
+      "etag": "\"35ae65c5889925bde6d4c2f35b4eab4e2a73dab1\""
+    },
+    "modeling_gravity_moe.py": {
+      "path": "modeling_gravity_moe.py",
+      "size_bytes": 2009,
+      "sha256": "b428baa2f68c8c41a13de18182535561dc0e1de71546474d0799b8d56531f2cc",
+      "etag": "\"1e2adb23e918b28986f00bddd2419319da973019\""
+    }
+  }
+}
+
