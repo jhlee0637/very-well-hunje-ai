@@ -115,7 +115,7 @@ class Settings:
             augmentation_token_limit=_positive_int(
                 "LUNIT_AUGMENTATION_TOKEN_LIMIT", 3000
             ),
-            model_max_tokens=_positive_int("LUNIT_MODEL_MAX_TOKENS", 2048),
+            model_max_tokens=_positive_int("LUNIT_MODEL_MAX_TOKENS", 1024),
             retrieval_model_max_tokens=_positive_int(
                 "LUNIT_RETRIEVAL_MODEL_MAX_TOKENS", 512
             ),

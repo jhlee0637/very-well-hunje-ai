@@ -46,15 +46,6 @@ def retain_validly_cited_segments(content: str, available: set[int]) -> str:
     return "\n".join(retained)
 
 
-def remove_unknown_citations(content: str, available: set[int]) -> str:
-    """Preserve answer content while removing citation labels absent from evidence."""
-
-    return CITATION_PATTERN.sub(
-        lambda match: match.group(0) if int(match.group(1)) in available else "",
-        content,
-    ).strip()
-
-
 def citations_complete(content: str, available: set[int]) -> bool:
     """Require every answer segment to end in a valid numeric citation."""
 

@@ -5,7 +5,7 @@ ENV LUNIT_SECRETS_FILE=/app/runtime_secret.json \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app/src \
-    LUNIT_GENERATION_PROMPT_PATH=/app/prompts/generation/production_tool_v4.md \
+    LUNIT_GENERATION_PROMPT_PATH=/app/prompts/generation/production_tool_v3.md \
     LUNIT_RETRIEVAL_PROMPT_PATH=/app/prompts/retrieval/grounded_v1.md
 
 WORKDIR /app
@@ -23,7 +23,6 @@ COPY runtime_secret.json /app/runtime_secret.json
 COPY prompts/generation/production_tool_v1.md /app/prompts/generation/production_tool_v1.md
 COPY prompts/generation/production_tool_v2.md /app/prompts/generation/production_tool_v2.md
 COPY prompts/generation/production_tool_v3.md /app/prompts/generation/production_tool_v3.md
-COPY prompts/generation/production_tool_v4.md /app/prompts/generation/production_tool_v4.md
 COPY prompts/retrieval/grounded_v1.md /app/prompts/retrieval/grounded_v1.md
 COPY src /app/src
 
