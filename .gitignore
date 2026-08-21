@@ -1,2 +1,12 @@
 secrets.json
-CODEX_HISTORY_JEHEE.log
+.env
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+eval/reports/
+*.duckdb
+*.duckdb.wal
+AGENTS_A.md
+CODEX_HISTORY*
+results/
