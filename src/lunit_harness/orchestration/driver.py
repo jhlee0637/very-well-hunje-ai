@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 from typing import Any
 
 from lunit_harness.citations.formatter import CitationFormatter
@@ -47,12 +46,6 @@ Use only the supplied evidence. Keep only claims directly supported by it.
 End every medical sentence or bullet with an allowed numeric citation.
 Do not call tools, invent facts or citations, add a source list, or discuss the repair.
 """.strip()
-
-RETRIEVAL_MARKUP_PATTERN = re.compile(
-    r"^\s*(?:<tool_call>\s*)?retrieve_relevant_content\s*\(.*\)\s*"
-    r"(?:</tool_call>)?\s*$",
-    re.DOTALL,
-)
 
 
 class HarnessDriver:
@@ -99,7 +92,6 @@ class HarnessDriver:
         available_citations: set[int] = set()
         retrieval_was_partial = False
         empty_response_retry_attempted = False
-        pseudo_tool_retry_attempted = False
         citation_repair_attempted = False
         citation_repair_fallback = ""
         retrieval_query = ""
@@ -162,25 +154,6 @@ class HarnessDriver:
                                 "instructions now: call retrieve_relevant_content when "
                                 "evidence is needed, otherwise return a non-empty final "
                                 "answer. Do not explain this retry."
-                            ),
-                        }
-                    )
-                    continue
-                if not allow_retrieval and self._looks_like_retrieval_markup(content):
-                    if pseudo_tool_retry_attempted:
-                        raise ModelProtocolError(
-                            "Generation repeated pseudo-tool markup while retrieval was disabled"
-                        )
-                    pseudo_tool_retry_attempted = True
-                    messages.append(
-                        {
-                            "role": "user",
-                            "content": (
-                                "The retrieval tool is not callable on this turn. Do not print "
-                                "tool names, pseudo-tool markup, XML, or function syntax. Return "
-                                "the final Korean answer now using the conversation and any "
-                                "existing tool result. Preserve numeric citations when evidence "
-                                "is already present. Do not explain this retry."
                             ),
                         }
                     )
@@ -408,10 +381,6 @@ class HarnessDriver:
             ensure_ascii=False,
             separators=(",", ":"),
         )
-
-    @staticmethod
-    def _looks_like_retrieval_markup(content: str) -> bool:
-        return RETRIEVAL_MARKUP_PATTERN.fullmatch(content) is not None
 
     def _no_evidence_response(
         self, template: dict[str, Any], aggregate_usage: dict[str, int]
