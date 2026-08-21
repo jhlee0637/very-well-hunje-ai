@@ -165,4 +165,3 @@ print(tokenizer.decode(output[0], skip_special_tokens=True))
 - tokenizer metadata 및 special tokens
 - remote-code file hash
 - model card의 benchmark와 limitations
-

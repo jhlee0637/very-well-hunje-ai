@@ -181,4 +181,3 @@
     "offline_evaluation_warning": "Do not download this model at evaluation runtime; the hackathon evaluation environment has no external network access."
   }
 }
-

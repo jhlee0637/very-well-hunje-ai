@@ -6,4 +6,3 @@ eval/reports/
 *.duckdb
 *.duckdb.wal
 AGENTS_A.md
-
