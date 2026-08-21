@@ -114,7 +114,9 @@ Retrieval은 질의 의도에 맞는 MCP schema 최대 8개만 노출하며, mod
 ## 통합 회귀 결과
 
 - Team B production prompt/case 해시는 handoff manifest와 일치합니다.
-- 애플리케이션 자동 테스트 71개와 평가 루브릭 테스트 6개, 합계 77개가 통과했습니다. Preflight는 6 pass, 0 fail이며 현재 Codex 프로세스에서 credential 미주입과 Docker CLI 미탐지를 warning으로 보고했습니다.
+- 애플리케이션 자동 테스트 73개와 평가 루브릭 테스트 6개, 합계 79개가 통과했습니다. Preflight는 6 pass, 0 fail이며 현재 Codex Python 프로세스에서 credential 미주입과 Docker CLI 자동 탐지 실패를 warning으로 보고했습니다.
+- 사용자 설치 Docker 29.7.2 Linux engine에서 image를 19.2초에 빌드했습니다. Direct smoke는 2,500 tokens와 604자 응답으로 종료됐고, 실제 MFDS retrieval smoke는 16,245 tokens와 숫자 citation을 반환했습니다.
+- MFDS smoke에서 citation fallback이 15,735 tokens를 쓰고도 핵심 내용을 66자로 축소하는 회귀를 발견했습니다. Unknown citation label만 제거하고 내용은 보존하도록 바꾼 뒤 동일 질문이 397자로 회복됐으며 token 증가는 3.2%였습니다.
 - Docker 실제 단일 턴과 지시어를 포함한 후속 턴은 HTTP 200, non-empty content, `finish_reason=stop`, 숫자 인용으로 통과했습니다.
 - Team B raw prompt runner 재실행은 단일 턴 3/7, 다중 턴 0/3이었으며, 주요 실패 축은 sentence-level citation completeness였습니다. 이 raw runner는 production driver의 bounded repair와 deterministic filtering을 적용하지 않은 prompt-only 기준선입니다.
 

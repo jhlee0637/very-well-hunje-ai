@@ -437,9 +437,9 @@ Team A는 API, orchestration, clients, tools, citations, Docker와 smoke/preflig
 - 실제 L2 생성, MCP protocol `2025-06-18`, 21개 tool 목록, non-query MCP call을 확인했다.
 - Team B의 `production_tool_v1.md`와 `grounded_v1.md`, 10개 case, 8개 fixture, simulator runner를 소유 경로에서 선택 통합했다. Production prompt와 case SHA-256은 handoff manifest와 일치한다.
 - `no_evidence`는 final Generation에서 확인하지 못한 범위를 밝히고 안전한 일반 조치·확인 단계·응급 경고를 보존한다. 근거 답변은 sentence-level citation completeness를 한 번 교정하고, 실패 시 유효 인용 문장만 보존해 unsupported attribution을 추가하지 않는다.
-- Docker 실제 단일 턴과 지시어를 포함한 후속 턴은 모두 HTTP 200, `finish_reason=stop`, non-empty content, numeric citation 포함으로 통과했다. 확인한 집계 token은 각각 16,437과 16,382였다.
+- 최종 v4 Docker direct smoke는 HTTP 200, `finish_reason=stop`, 604자와 2,500 tokens로 통과했다. 실제 MFDS retrieval smoke는 397자와 16,245 tokens, 숫자 citation 및 적응증 내용을 반환했다.
 - Runtime credential은 Docker image에 포함하지 않고 실행 환경에서 주입한다. 누락 시 임상 응답으로 위장하지 않는 configuration error를 반환한다.
-- Docker Desktop Linux engine에서 약 128 MiB 이미지를 18.3초에 빌드했고, 자동 startup, 필수 endpoint, read-only runtime secret mount, image의 secret·문서·테스트·cache 제외를 확인했다.
+- Docker Desktop 29.7.2 Linux engine에서 최종 약 48.5 MB 이미지를 첫 빌드 19.2초에 생성했고, 자동 startup, 필수 endpoint, runtime 환경변수 주입, image의 secret·문서·테스트·cache 제외를 확인했다.
 - Team B raw prompt runner 재실행 결과는 단일 턴 3/7, 다중 턴 0/3이었다. Groundedness·citation correctness·unsupported addition·deflection·no-evidence는 단일 턴에서 모두 통과했고, 주요 실패는 production postcondition 적용 전 sentence-level citation completeness였다.
 - 로컬 TLS inspection 환경은 검증을 끄지 않고 BuildKit secret으로 공개 Root CA를 추가하며, Python 3.13에서는 chain·hostname 검증을 유지한 채 `VERIFY_X509_STRICT` 호환성 플래그만 완화한다. 일반 제출 build에는 로컬 CA secret이 필요하지 않다.
 - 불확실한 guideline vector query는 citable evidence를 얻지 못할 수 있으며, 이 경우 파이프라인은 fabricated citation 대신 `no_evidence`로 강등한다. Retrieval 품질은 Team B 평가 case로 계속 측정한다.

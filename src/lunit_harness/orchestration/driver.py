@@ -24,7 +24,7 @@ from lunit_harness.orchestration.routing import should_offer_retrieval
 from lunit_harness.tools.retrieve_relevant_content import RetrieveRelevantContent
 from lunit_harness.validation.citations import (
     citations_complete,
-    retain_validly_cited_segments,
+    remove_unknown_citations,
 )
 
 
@@ -192,6 +192,15 @@ class HarnessDriver:
                             NO_EVIDENCE_SAFE_FALLBACK,
                             aggregate_usage,
                         )
+                    if citation_repair_attempted and citation_repair_fallback:
+                        return self._text_response(
+                            response,
+                            self._with_partial_notice(
+                                citation_repair_fallback,
+                                retrieval_was_partial,
+                            ),
+                            aggregate_usage,
+                        )
                     if empty_response_retry_attempted:
                         raise ModelProtocolError("Generation returned an empty final answer")
                     empty_response_retry_attempted = True
@@ -233,23 +242,30 @@ class HarnessDriver:
                     content, available_citations
                 ):
                     if citation_repair_attempted:
-                        retained = retain_validly_cited_segments(
+                        repaired_without_unknown_citations = remove_unknown_citations(
                             content, available_citations
                         )
-                        if not retained:
-                            retained = citation_repair_fallback
-                        if retained:
+                        candidates = [
+                            candidate
+                            for candidate in (
+                                citation_repair_fallback,
+                                repaired_without_unknown_citations,
+                            )
+                            if candidate.strip()
+                        ]
+                        if candidates:
+                            preserved = max(candidates, key=len)
                             return self._text_response(
                                 response,
                                 self._with_partial_notice(
-                                    retained, retrieval_was_partial
+                                    preserved, retrieval_was_partial
                                 ),
                                 aggregate_usage,
                             )
                         raise ModelProtocolError(
-                            "Citation repair did not preserve any grounded claim"
+                            "Citation repair did not preserve any answer content"
                         )
-                    citation_repair_fallback = retain_validly_cited_segments(
+                    citation_repair_fallback = remove_unknown_citations(
                         content, available_citations
                     )
                     citation_repair_attempted = True

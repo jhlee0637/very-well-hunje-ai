@@ -219,7 +219,7 @@ Trial 4의 4.05점과 17.5M tokens(input 16.7M / output 860.4K)를 기준으로,
 
 | 검증 | 결과 |
 |---|---:|
-| 자동 테스트 | app 71/71 + eval 6/6 = 77/77 |
+| 자동 테스트 | app 73/73 + eval 6/6 = 79/79 |
 | 전체 v4 route holdout | 18/20 (90%), 완료 20/20, 오류 0 |
 | Citation correctness / completeness | 100% / 100% |
 | Unsupported addition / contradiction / deflection | 100% / 100% / 0% deflection rate |
@@ -229,3 +229,9 @@ Trial 4의 4.05점과 17.5M tokens(input 16.7M / output 860.4K)를 기준으로,
 | 남은 두 축 targeted 재검증 | 2/2 통과 |
 
 마지막 두 실패는 특정 정답을 prompt에 추가하지 않고, 일반적인 간결 설명 표현을 direct signal로 확장하고 no-evidence 고지의 완결성을 검사하는 방식으로 수정했습니다. 이 결과는 공식 dashboard 점수가 아니며, 안전 보정으로 늘어난 호출 비용은 공식 token 사용량과 함께 관찰합니다.
+
+### 최종 Docker citation completeness 회귀
+
+Docker 29.7.2 Linux engine에서 image를 19.2초에 빌드하고 direct와 실제 MFDS retrieval을 재검증했습니다. Direct는 2,500 tokens, 604자, 불필요한 citation 없이 종료했습니다. 첫 retrieval은 15,735 tokens를 사용했지만 failed citation repair가 유효 인용 문장만 남기면서 답변을 66자로 축소했습니다. 이는 Trial 5 저점 진단의 completeness 손실과 같은 production 병목입니다.
+
+Fallback을 unknown citation label 제거 + 내용 보존 방식으로 바꾼 동일 retrieval은 16,245 tokens, 397자, 숫자 citation과 실제 적응증 내용을 반환했습니다. Token은 3.2% 증가했지만 핵심 임상 내용은 약 6배로 회복됐습니다. Citation repair가 완전하면 기존 엄격 경로를 유지하고, 두 번째 교정도 불완전할 때만 이 content-preserving fallback을 사용합니다.
