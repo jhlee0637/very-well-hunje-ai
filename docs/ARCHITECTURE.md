@@ -6,8 +6,8 @@
 
 상충하는 내용이 있으면 다음 순서로 적용한다.
 
-1. `doc/HACKATHON.md`
-2. `doc/SUPPORT_PARAMETER.md`
+1. `docs/HACKATHON.md`
+2. `docs/SUPPORT_PARAMETER.md`
 3. Repository root의 `AGENTS.md`
 4. 이 문서와 로컬 Team A 작업 지침 `AGENTS_A.md`
 
