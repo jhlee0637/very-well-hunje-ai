@@ -1,1 +1,9 @@
 secrets.json
+runtime_secret.json
+docs/HACKATHON.md
+doc/HACKATHON.md
+eval/
+tests/
+CODEX_HISTORY*
+notification-*.md
+results/
