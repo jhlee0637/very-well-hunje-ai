@@ -10,3 +10,9 @@ eval/reports/
 AGENTS_A.md
 CODEX_HISTORY*
 results/
+runtime_secret.json
+docs/HACKATHON.md
+doc/HACKATHON.md
+eval/
+tests/
+notification-*.md
