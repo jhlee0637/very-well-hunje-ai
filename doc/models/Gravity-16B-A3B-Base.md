@@ -127,7 +127,7 @@ Gravity-16B-A3B-Base는 Trillion Labs와 Lunit Consortium이 random weights에�
 - `trust_remote_code=True` 및 로컬 Transformers loading 방식
 - Base checkpoint의 MMLU, MedQA, CoQA 등 공개 benchmark 점수
 
-L2의 conversation, retrieval/generation 단계, tool schema, 지원 parameter와 context 한도는 `../HACKATHON.md`, `../SUPPORT_PARAMETER.md` 및 실제 endpoint 검증 결과를 우선한다.
+L2의 conversation, retrieval/generation 단계, tool schema, 지원 parameter와 context 한도는 `../SUPPORT_PARAMETER.md`와 로컬 대회 규칙 원문 및 실제 endpoint 검증 결과를 우선한다.
 
 ## Minimal inference reference
 
