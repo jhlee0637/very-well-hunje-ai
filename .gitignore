@@ -11,3 +11,8 @@ AGENTS_A.md
 CODEX_HISTORY*
 notification-*.md
 results/
+runtime_secret.json
+docs/HACKATHON.md
+doc/HACKATHON.md
+eval/
+tests/
